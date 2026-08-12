@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models.admin import User
+from app.models.admin_model import User
 from app.schemas.admin_schema import UserCreate, UserUpdate
 from app.core.security import hash_password
 

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.core.security import decode_token
-from app.models.admin import User
+from app.models.admin_model import User
 
 from app.exceptions.custom_exceptions import UnauthorizedException
 from app.exceptions import messages as msg

@@ -18,3 +18,15 @@ alembic init alembic
 
 ## upgrade alembic head
 alembic upgrade head
+
+
+
+## steps to delete alembic versions and fresh start 
+        1 - DROP DATABASE blinkit_db;
+        2 - CREATE DATABASE blinkit_db;
+
+        ## delete migraton files
+        3 - rm -f alembic/versions/*.py
+        
+        ## fresh migration
+        4 - alembic revision --autogenerate -m "initial schema"

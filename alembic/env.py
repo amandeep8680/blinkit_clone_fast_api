@@ -9,8 +9,9 @@ from app.database.database import Base , DATABASE_URL
 # IMPORTANT:
 # Models import hone chahiye so that
 # Base.metadata knows about their tables.
-from app.models.admin import User
-
+from app.models.admin_model import User
+from app.models.branches_model import Branch
+from app.models.branchmanager_model import BranchManager
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

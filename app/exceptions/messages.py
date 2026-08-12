@@ -57,3 +57,11 @@ INTERNAL_SERVER_ERROR = "Something went wrong."
 
 TOKEN_EXPIRED = "Authentication token has expired."
 INVALID_TOKEN = "Invalid authentication token."
+
+
+# =========================
+# Branch Related Messages
+# =========================
+
+BRANCH_ALREADY_EXISTS = "Branch already exists."
+BRANCH_NOT_FOUND = "Branch not found."

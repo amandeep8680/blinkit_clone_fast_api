@@ -11,7 +11,7 @@ from app.schemas.admin_schema import (
 )
 from app.services.admin_service import UserService
 from app.auth.dependencies import get_current_user
-from app.models.admin import User
+from app.models.admin_model import User
 from app.constants import roles
 from app.auth.authorization import require_roles
 
