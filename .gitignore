@@ -1,3 +1,8 @@
 .env
 utilities
 venv
+app/core/__pycache__/config.cpython-314.pyc
+app/exceptions/__pycache__/custom_exceptions.cpython-314.pyc
+app/routes/__pycache__/auth_routes.cpython-314.pyc
+/app/schemas/__pycache__
+/app/services/__pycache__
