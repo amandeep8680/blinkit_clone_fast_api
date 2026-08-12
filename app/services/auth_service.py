@@ -7,6 +7,7 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
+    decode_token
 )
 
 from app.exceptions.custom_exceptions import UnauthorizedException
@@ -56,4 +57,44 @@ class AuthService:
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
+        }
+
+
+
+
+    def refresh_access_token(
+            self, 
+            db:Session,
+            refresh_token:str
+    ):
+        payload = decode_token(refresh_token)
+
+        if payload.get("type") != "refresh":
+            raise UnauthorizedException(
+                msg.INVALID_TOKEN
+            )
+        unique_id = payload.get("sub")
+        
+        if not unique_id:
+            raise UnauthorizedException(
+                msg.INVALID_TOKEN
+            )
+        user = (
+        db.query(User)
+        .filter(User.unique_id == unique_id)
+        .first()
+        )
+
+        if not user:
+            raise UnauthorizedException(
+                msg.INVALID_TOKEN
+        )
+        
+        new_access_token = create_access_token(
+            unique_id
+        )
+
+        return {
+            "access_token": new_access_token,
+            "token_type":"bearer"
         }

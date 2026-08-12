@@ -6,6 +6,8 @@ from app.database.database import get_db
 from app.schemas.auth_schema import (
     LoginRequest,
     TokenResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse
 )
 from app.services.auth_service import AuthService
 
@@ -35,4 +37,19 @@ def login(
     return auth_service.login(
         db=db,
         credentials=credentials
+    )
+
+
+
+@router.post(
+    "/refresh",
+    response_model=RefreshTokenResponse
+)
+def refresh_token(
+    db : DBSession,
+    data : RefreshTokenRequest
+):
+    return auth_service.refresh_access_token(
+        db=db ,
+        refresh_token= data.refresh_token
     )
