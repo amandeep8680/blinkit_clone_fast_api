@@ -9,8 +9,7 @@ class UserCreate(BaseModel):
 
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
-    password: str
-
+    password: str    
 
 # Data sent back to client
 class UserResponse(BaseModel):
@@ -18,6 +17,7 @@ class UserResponse(BaseModel):
     unique_id: str
     name: str
     email: EmailStr
+    role :str
     is_active: bool
     created_at: datetime
 
@@ -37,6 +37,7 @@ class UpdatedUserResponse(BaseModel):
     right now it is only name .'''
     unique_id: str
     name: str
+    role:str
     email: EmailStr
     is_active: bool
     updated_at : datetime
@@ -44,10 +45,10 @@ class UpdatedUserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
+                                                       
 
 class UserDeleteResponse(BaseModel):
-    ''' Schema to delete the user'''
+    '''Schema to delete the user'''
     unique_id : str
     name : str
     message : str

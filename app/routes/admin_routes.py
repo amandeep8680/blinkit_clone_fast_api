@@ -1,16 +1,20 @@
 from fastapi import APIRouter, Depends
 from typing import Annotated
 from sqlalchemy.orm import Session
-
 from app.database.database import get_db
-from app.schemas.userschema import (
+from app.schemas.admin_schema import (
     UserCreate,
     UserResponse,
     UserUpdate,
     UpdatedUserResponse,
     UserDeleteResponse,
 )
-from app.services.user_service import UserService
+from app.services.admin_service import UserService
+from app.auth.dependencies import get_current_user
+from app.models.admin import User
+from app.constants import roles
+from app.auth.authorization import require_roles
+
 
 
 router = APIRouter(
@@ -48,46 +52,46 @@ def create_super_admin(
     response_model=UserResponse
 )
 def get_admin(
-    unique_id: str,
     db: DBSession,
+    current_user: User = Depends(require_roles(roles.SUPER_ADMIN)), 
 ):
     """Get Super Admin details."""
 
     return user_service.get_admin(
         db=db,
-        unique_id=unique_id
+        unique_id=current_user.unique_id
     )
 
 
 @router.patch(
-    "/update/{unique_id}",
+    "/update",
     response_model=UpdatedUserResponse
 )
 def update_super_admin(
-    unique_id: str,
     user: UserUpdate,
     db: DBSession,
+    current_user: User = Depends(require_roles(roles.SUPER_ADMIN)),
 ):
     """Update Super Admin."""
 
     return user_service.update_super_admin(
         db=db,
-        unique_id=unique_id,
+        unique_id=current_user.unique_id,
         user=user
     )
 
 
 @router.delete(
-    "/delete/{unique_id}",
+    "/delete",
     response_model=UserDeleteResponse
 )
 def delete_admin(
-    unique_id: str,
     db: DBSession,
+    current_user: User = Depends(require_roles(roles.SUPER_ADMIN)),
 ):
     """Delete Super Admin."""
 
     return user_service.delete_admin(
         db=db,
-        unique_id=unique_id
+        unique_id=current_user.unique_id
     )

@@ -43,7 +43,8 @@ def verify_password(plain_password : str , hashed_password : str ) -> bool:
 # -----------------------------------
 
 def create_access_token(
-        unique_id:str
+        unique_id:str,
+        role:str
 ) ->str:
     expire = (
         datetime.now(timezone.utc)
@@ -54,6 +55,7 @@ def create_access_token(
 
     payload = {
         "sub":unique_id,
+        "role":role,
         "type":"access",
         "exp": expire
     }
@@ -70,7 +72,8 @@ def create_access_token(
 
 
 def create_refresh_token(
-    unique_id: str
+    unique_id: str,
+    role:str
 ) -> str:
 
     expire = (
@@ -83,6 +86,7 @@ def create_refresh_token(
     payload = {
         "sub": unique_id,
         "type": "refresh",
+        "role":role,
         "exp": expire,
     }
 

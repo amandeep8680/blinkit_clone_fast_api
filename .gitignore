@@ -1,12 +1,13 @@
+# Environment
 .env
-utilities
-venv
-app/core/__pycache__/config.cpython-314.pyc
-app/exceptions/__pycache__/custom_exceptions.cpython-314.pyc
-app/routes/__pycache__/auth_routes.cpython-314.pyc
-/app/schemas/__pycache__
-/app/services/__pycache__
 .env.*
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
 
 # macOS
 .DS_Store
@@ -17,8 +18,4 @@ app/routes/__pycache__/auth_routes.cpython-314.pyc
 
 # Logs
 *.log
-app/core/__pycache__/security.cpython-314.pyc
-app/__pycache__/main.cpython-314.pyc
-/app/database/__pycache__
-.pyc
-.__pycache__
+

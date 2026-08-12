@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models.usermodel import User
+from app.models.admin import User
 from app.schemas.auth_schema import LoginRequest
 
 from app.core.security import (
@@ -46,11 +46,15 @@ class AuthService:
             )
 
         access_token = create_access_token(
-            user.unique_id
+            user.unique_id,
+            user.role
         )
 
         refresh_token = create_refresh_token(
-            user.unique_id
+            user.unique_id,
+            user.role
+
+            
         )
 
         return {

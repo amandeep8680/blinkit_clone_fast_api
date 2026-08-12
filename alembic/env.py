@@ -9,7 +9,7 @@ from app.database.database import Base , DATABASE_URL
 # IMPORTANT:
 # Models import hone chahiye so that
 # Base.metadata knows about their tables.
-from app.models.usermodel import User
+from app.models.admin import User
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

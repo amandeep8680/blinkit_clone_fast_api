@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database.database import engine
-from app.routes.user_routes import router as user_router
+from app.routes.admin_routes import router as user_router
 from app.middleware.logging_middleware import (logging_middleware)
 from app.routes.auth_routes import router as auth_router
 
@@ -64,9 +64,9 @@ app.middleware("http")(logging_middleware)
 # -----------------------------------
 # Routers
 # -----------------------------------
-
-app.include_router(user_router)
 app.include_router(auth_router)
+app.include_router(user_router)
+
 
 # Future routers
 # app.include_router(auth_router)

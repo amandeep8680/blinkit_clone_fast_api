@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.models.usermodel import User
-from app.schemas.userschema import UserCreate, UserUpdate
+from app.models.admin import User
+from app.schemas.admin_schema import UserCreate, UserUpdate
 from app.core.security import hash_password
 
 from app.exceptions.custom_exceptions import (
@@ -35,7 +35,8 @@ class UserService:
         new_admin = User(
             name=user.name,
             email=user.email,
-            password_hash=hash_password(user.password)
+            password_hash=hash_password(user.password),
+            role = "super-admin"
         )
 
         db.add(new_admin)
