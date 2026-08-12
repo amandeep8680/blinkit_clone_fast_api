@@ -24,3 +24,5 @@ venv/
 app/core/__pycache__/security.cpython-314.pyc
 app/__pycache__/main.cpython-314.pyc
 /app/database/__pycache__
+.pyc
+.__pycache__
