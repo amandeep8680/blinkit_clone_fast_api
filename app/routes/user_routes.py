@@ -14,8 +14,8 @@ from app.services.user_service import UserService
 
 
 router = APIRouter(
-    prefix="/super-user",
-    tags=["Users"]
+    prefix="/admin",
+    tags=["Admin"]
 )
 
 

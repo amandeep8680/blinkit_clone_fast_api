@@ -48,3 +48,12 @@ BRANCH_NOT_FOUND = "Branch not found."
 # =========================
 
 INTERNAL_SERVER_ERROR = "Something went wrong."
+
+
+
+# =========================
+# JWT Token Messages
+# =========================
+
+TOKEN_EXPIRED = "Authentication token has expired."
+INVALID_TOKEN = "Invalid authentication token."

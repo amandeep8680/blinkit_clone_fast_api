@@ -4,7 +4,7 @@ from app.models.usermodel import User
 from app.schemas.userschema import UserCreate, UserUpdate
 from app.core.security import hash_password
 
-from app.exceptions.custom_exception import (
+from app.exceptions.custom_exceptions import (
     ConflictException,
     NotFoundException,
 )
@@ -119,5 +119,4 @@ class UserService:
 
         db.delete(existing_user)
         db.commit()
-
         return response
