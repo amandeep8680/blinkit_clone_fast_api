@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database.database import Base
@@ -69,4 +70,11 @@ class Branch(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    # One-to-one relationship with BranchManager.
+    manager = relationship(
+        "BranchManager",
+        back_populates="branch",
+        uselist=False,
     )

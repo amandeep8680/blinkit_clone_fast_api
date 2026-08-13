@@ -1,9 +1,12 @@
 from sqlalchemy.orm import Session
 
 from app.models.branches_model import Branch
+from app.models.branchmanager_model import BranchManager
+
 from app.schemas.branch_schema import (
     BranchCreate,
     BranchUpdate,
+    BranchManagerAssign,
 )
 
 from app.exceptions.custom_exceptions import (
@@ -21,7 +24,12 @@ class BranchService:
         db: Session,
         branch: BranchCreate,
     ):
-        """Create a new branch."""
+        """
+        Create a new branch.
+
+        A branch is considered duplicate when another branch
+        with the same name and city already exists.
+        """
 
         existing_branch = (
             db.query(Branch)
@@ -56,7 +64,9 @@ class BranchService:
         db: Session,
         unique_id: str,
     ):
-        """Get a branch using its public unique ID."""
+        """
+        Return a branch using its public unique ID.
+        """
 
         branch = (
             db.query(Branch)
@@ -74,13 +84,29 @@ class BranchService:
         return branch
 
 
+    def get_all_branches(
+        self,
+        db: Session,
+    ):
+        """
+        Return all branches.
+        """
+
+        return db.query(Branch).all()
+
+
     def update_branch(
         self,
         db: Session,
         unique_id: str,
         branch_data: BranchUpdate,
     ):
-        """Update branch information."""
+        """
+        Update branch information.
+
+        Only the fields provided in the request body
+        will be updated.
+        """
 
         branch = (
             db.query(Branch)
@@ -100,7 +126,11 @@ class BranchService:
         )
 
         for field, value in update_data.items():
-            setattr(branch, field, value)
+            setattr(
+                branch,
+                field,
+                value
+            )
 
         db.commit()
         db.refresh(branch)
@@ -108,17 +138,79 @@ class BranchService:
         return branch
 
 
-    def get_all_branches(
+    def assign_branch_manager(
         self,
         db: Session,
+        branch_unique_id: str,
+        manager_data: BranchManagerAssign,
     ):
-        """Return all branches."""
+        """
+        Assign or change the manager of a branch.
 
-        branches = db.query(Branch).all()
+        The branch is identified using its public unique ID.
+        The manager is also identified using a public unique ID.
 
-        return branches
+        If the branch already has a manager, the old manager
+        is unassigned before the new manager is assigned.
+        """
 
+        # Find the branch that needs a manager.
+        branch = (
+            db.query(Branch)
+            .filter(
+                Branch.unique_id == branch_unique_id
+            )
+            .first()
+        )
 
+        if not branch:
+            raise NotFoundException(
+                msg.BRANCH_NOT_FOUND
+            )
+
+        # Find the manager that should be assigned.
+        manager = (
+            db.query(BranchManager)
+            .filter(
+                BranchManager.unique_id
+                == manager_data.manager_unique_id
+            )
+            .first()
+        )
+
+        if not manager:
+            raise NotFoundException(
+                msg.BRANCH_MANAGER_NOT_FOUND
+            )
+
+        # Prevent assigning the same manager again.
+        if branch.manager and branch.manager.id == manager.id:
+            raise ConflictException(
+                "This manager is already assigned to this branch."
+            )
+
+        # A manager can only manage one branch.
+        if manager.branch_id is not None:
+            raise ConflictException(
+                "This manager is already assigned to another branch."
+            )
+
+        # If this branch already has a manager,
+        # remove the previous assignment first.
+        if branch.manager:
+            branch.manager.branch_id = None
+
+        # Assign the new manager using the internal branch ID.
+        manager.branch_id = branch.id
+
+        db.commit()
+
+        # Refresh both objects so the latest relationship
+        # is available in the returned branch object.
+        db.refresh(branch)
+        db.refresh(manager)
+
+        return branch
 
 
     def delete_branch(
@@ -126,7 +218,13 @@ class BranchService:
         db: Session,
         unique_id: str,
     ):
-        """Delete a branch."""
+        """
+        Delete a branch.
+
+        If a manager is currently assigned to the branch,
+        the manager is first unassigned so that the manager
+        record can continue to exist independently.
+        """
 
         branch = (
             db.query(Branch)
@@ -140,6 +238,10 @@ class BranchService:
             raise NotFoundException(
                 msg.BRANCH_NOT_FOUND
             )
+
+        # Unassign the manager before deleting the branch.
+        if branch.manager:
+            branch.manager.branch_id = None
 
         response = {
             "unique_id": branch.unique_id,

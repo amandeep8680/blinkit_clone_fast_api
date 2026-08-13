@@ -1,16 +1,20 @@
 from sqlalchemy.orm import Session
 
 from app.models.admin_model import User
+from app.models.branchmanager_model import BranchManager
+
 from app.schemas.auth_schema import LoginRequest
 
 from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
-    decode_token
 )
 
-from app.exceptions.custom_exceptions import UnauthorizedException
+from app.exceptions.custom_exceptions import (
+    UnauthorizedException,
+)
+
 from app.exceptions import messages as msg
 
 
@@ -19,86 +23,68 @@ class AuthService:
     def login(
         self,
         db: Session,
-        credentials: LoginRequest
+        credentials: LoginRequest,
     ):
-        user = (
+        """
+        Authenticate an Admin or Branch Manager
+        and return access and refresh tokens.
+        """
+
+        # First, try to find the user in the Admin table.
+        current_user = (
             db.query(User)
             .filter(User.email == credentials.email)
             .first()
         )
 
-        if not user:
+        # If no Admin exists with this email,
+        # try to find a Branch Manager.
+        if not current_user:
+            current_user = (
+                db.query(BranchManager)
+                .filter(
+                    BranchManager.email
+                    == credentials.email
+                )
+                .first()
+            )
+
+        # No user exists with the provided email.
+        if not current_user:
             raise UnauthorizedException(
                 msg.INVALID_CREDENTIALS
             )
 
+        # Verify the provided password against
+        # the stored hashed password.
         if not verify_password(
             credentials.password,
-            user.password_hash
+            current_user.password_hash,
         ):
             raise UnauthorizedException(
                 msg.INVALID_CREDENTIALS
             )
 
-        if not user.is_active:
+        # Prevent inactive users from logging in.
+        if not current_user.is_active:
             raise UnauthorizedException(
-                msg.SUPER_ADMIN_INACTIVE
+                msg.USER_INACTIVE
             )
 
+        # Generate JWT tokens using the role
+        # stored on the authenticated user.
         access_token = create_access_token(
-            user.unique_id,
-            user.role
+            unique_id=current_user.unique_id,
+            role=current_user.role,
         )
 
         refresh_token = create_refresh_token(
-            user.unique_id,
-            user.role
-
-            
+            unique_id=current_user.unique_id,
+            role=current_user.role,
         )
 
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
-        }
-
-
-
-
-    def refresh_access_token(
-            self, 
-            db:Session,
-            refresh_token:str
-    ):
-        payload = decode_token(refresh_token)
-
-        if payload.get("type") != "refresh":
-            raise UnauthorizedException(
-                msg.INVALID_TOKEN
-            )
-        unique_id = payload.get("sub")
-        
-        if not unique_id:
-            raise UnauthorizedException(
-                msg.INVALID_TOKEN
-            )
-        user = (
-        db.query(User)
-        .filter(User.unique_id == unique_id)
-        .first()
-        )
-
-        if not user:
-            raise UnauthorizedException(
-                msg.INVALID_TOKEN
-        )
-        
-        new_access_token = create_access_token(
-            unique_id
-        )
-
-        return {
-            "access_token": new_access_token,
-            "token_type":"bearer"
         }

@@ -36,6 +36,12 @@ class BranchUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class BranchManagerAssign(BaseModel):
+    """Schema used to assign or change the manager of a branch."""
+
+    manager_unique_id: str
+
+
 class BranchDeleteResponse(BaseModel):
     """Schema returned after deleting a branch."""
 

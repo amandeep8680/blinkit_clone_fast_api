@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database.database import Base
@@ -57,10 +58,12 @@ class BranchManager(Base):
         default=BRANCH_MANAGER,
     )
 
+    # Internal database relationship.
+    # nullable=True allows creating a manager before assigning a branch.
     branch_id = Column(
         Integer,
         ForeignKey("branches.id"),
-        nullable=False,
+        nullable=True,
         unique=True,
     )
 
@@ -81,4 +84,10 @@ class BranchManager(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    # Gives access to the assigned Branch object.
+    branch = relationship(
+        "Branch",
+        back_populates="manager",
     )
