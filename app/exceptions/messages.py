@@ -65,3 +65,40 @@ INVALID_TOKEN = "Invalid authentication token."
 
 BRANCH_ALREADY_EXISTS = "Branch already exists."
 BRANCH_NOT_FOUND = "Branch not found."
+
+# =========================
+# Brand Messages
+# =========================
+
+BRAND_ALREADY_EXISTS = "Brand already exists."
+BRAND_NAME_ALREADY_EXISTS = "Brand with this name already exists."
+BRAND_SLUG_ALREADY_EXISTS = "Brand with this slug already exists."
+BRAND_NOT_FOUND = "Brand not found."
+BRAND_ALREADY_ACTIVE = "Brand is already active."
+BRAND_ALREADY_INACTIVE = "Brand is already inactive."
+BRAND_DELETED = "Brand deleted successfully."
+
+# =========================
+# Category Messages
+# =========================
+
+CATEGORY_ALREADY_EXISTS = "Category already exists."
+CATEGORY_NAME_ALREADY_EXISTS = "Category with this name already exists."
+CATEGORY_SLUG_ALREADY_EXISTS = "Category with this slug already exists."
+CATEGORY_NOT_FOUND = "Category not found."
+CATEGORY_ALREADY_ACTIVE = "Category is already active."
+CATEGORY_ALREADY_INACTIVE = "Category is already inactive."
+CATEGORY_DELETED = "Category deleted successfully."
+
+
+# =========================
+# SubCategory Messages
+# =========================
+
+SUBCATEGORY_ALREADY_EXISTS = "SubCategory already exists."
+SUBCATEGORY_NAME_ALREADY_EXISTS = "SubCategory with this name already exists."
+SUBCATEGORY_SLUG_ALREADY_EXISTS = "SubCategory with this slug already exists."
+SUBCATEGORY_NOT_FOUND = "SubCategory not found."
+SUBCATEGORY_ALREADY_ACTIVE = "SubCategory is already active."
+SUBCATEGORY_ALREADY_INACTIVE = "SubCategory is already inactive."
+SUBCATEGORY_DELETED = "SubCategory deleted successfully."

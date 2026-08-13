@@ -10,7 +10,9 @@ from app.middleware.logging_middleware import (logging_middleware)
 from app.routes.auth_routes import router as auth_router
 from app.routes.branch_routes import router as branch_router
 from app.routes.branchmanager_routes import (router as branch_manager_router)
-
+from app.routes.brand_routes import router as brand_router
+from app.routes.category_routes import router as category_router
+from app.routes.subcategory_routes import router as subcategory_router
 
 # -----------------------------------
 # Application Lifespan
@@ -70,4 +72,6 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(branch_router)
 app.include_router(branch_manager_router)
-
+app.include_router(brand_router)
+app.include_router(category_router)
+app.include_router(subcategory_router)
