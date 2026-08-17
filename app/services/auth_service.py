@@ -9,6 +9,7 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
+    decode_token
 )
 
 from app.exceptions.custom_exceptions import (
@@ -86,5 +87,73 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
+            "token_type": "bearer",
+        }
+
+
+    def refresh_access_token(
+        self,
+        db: Session,
+        refresh_token: str,
+        ):
+        """
+        Generate a new access token using a valid refresh token.
+        """
+
+        # 1. Refresh token ko decode karo
+        payload = decode_token(refresh_token)
+
+        # 2. Check karo ki token actually refresh token hai
+        if payload.get("type") != "refresh":
+            raise UnauthorizedException(
+                msg.INVALID_TOKEN
+            )
+
+        # 3. Token se user information nikalo
+        unique_id = payload.get("sub")
+        role = payload.get("role")
+
+        if not unique_id or not role:
+            raise UnauthorizedException(
+                msg.INVALID_TOKEN
+            )
+
+        # 4. User Admin table me search karo
+        current_user = (
+            db.query(User)
+            .filter(User.unique_id == unique_id)
+            .first()
+        )
+
+        # 5. Admin nahi mila to BranchManager me search karo
+        if not current_user:
+            current_user = (
+                db.query(BranchManager)
+                .filter(
+                    BranchManager.unique_id == unique_id
+                )
+                .first()
+            )
+
+        # 6. User exist nahi karta
+        if not current_user:
+            raise UnauthorizedException(
+                msg.INVALID_TOKEN
+            )
+
+        # 7. Inactive user ko new token mat do
+        if not current_user.is_active:
+            raise UnauthorizedException(
+                msg.USER_INACTIVE
+            )
+
+        # 8. Naya access token banao
+        access_token = create_access_token(
+            unique_id=current_user.unique_id,
+            role=current_user.role,
+        )
+
+        return {
+            "access_token": access_token,
             "token_type": "bearer",
         }

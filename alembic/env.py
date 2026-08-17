@@ -15,6 +15,9 @@ from app.models.branchmanager_model import BranchManager
 from app.models.brand_model import Brand
 from app.models.category_model import Category
 from app.models.subcategory_model import SubCategory
+from app.models.product_model import Product
+from app.models.product_variant_model import ProductVariant
+from app.models.product_image_model import ProductImage
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

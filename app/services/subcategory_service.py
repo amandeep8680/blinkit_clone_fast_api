@@ -275,8 +275,7 @@ class SubCategoryService:
         return subcategory
 
 
-    def deactivate_subcategory(
-        self,
+    def deactivate_subcategory(self,
         db: Session,
         subcategory_unique_id: str,
     ):

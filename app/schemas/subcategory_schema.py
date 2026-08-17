@@ -19,7 +19,7 @@ class SubCategoryUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
     image_url: Optional[str] = None
-    is_active: Optional[bool] = None
+    
 
 
 class SubCategoryResponse(SubCategoryBase):

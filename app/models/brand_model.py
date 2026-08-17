@@ -1,7 +1,7 @@
 # app/models/brand_model.py
 
 import uuid
-
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, String, Boolean, DateTime , Integer
 from sqlalchemy.sql import func
 
@@ -32,3 +32,9 @@ class Brand(Base):
         server_default=func.now(),
         onupdate=func.now()
     )
+
+
+    products = relationship(
+    "Product",
+    back_populates="brand",
+)

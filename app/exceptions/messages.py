@@ -102,3 +102,38 @@ SUBCATEGORY_NOT_FOUND = "SubCategory not found."
 SUBCATEGORY_ALREADY_ACTIVE = "SubCategory is already active."
 SUBCATEGORY_ALREADY_INACTIVE = "SubCategory is already inactive."
 SUBCATEGORY_DELETED = "SubCategory deleted successfully."
+
+
+# =========================
+# Product Messages
+# =========================
+
+PRODUCT_ALREADY_EXISTS = "Product already exists."
+PRODUCT_NAME_ALREADY_EXISTS = "Product with this name already exists."
+PRODUCT_SLUG_ALREADY_EXISTS = "Product with this slug already exists."
+PRODUCT_NOT_FOUND = "Product not found."
+PRODUCT_ALREADY_ACTIVE = "Product is already active."
+PRODUCT_ALREADY_INACTIVE = "Product is already inactive."
+PRODUCT_DELETED = "Product deleted successfully."
+
+
+# =========================
+# Product Variant Messages
+# =========================
+
+PRODUCT_VARIANT_ALREADY_EXISTS = "Product variant already exists."
+PRODUCT_VARIANT_NOT_FOUND = "Product variant not found."
+PRODUCT_VARIANT_SKU_ALREADY_EXISTS = "Product variant with this SKU already exists."
+PRODUCT_VARIANT_ALREADY_ACTIVE = "Product variant is already active."
+PRODUCT_VARIANT_ALREADY_INACTIVE = "Product variant is already inactive."
+PRODUCT_VARIANT_DELETED = "Product variant deleted successfully."
+INVALID_PRODUCT_VARIANT_PRICE = "Selling price cannot be greater than MRP."
+
+
+# =========================
+# Product Image Messages
+# =========================
+
+PRODUCT_IMAGE_NOT_FOUND = "Product image not found."
+PRODUCT_IMAGE_DELETED = "Product image deleted successfully."
+PRODUCT_PRIMARY_IMAGE_ALREADY_EXISTS = "A primary image already exists for this product."
