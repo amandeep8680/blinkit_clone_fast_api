@@ -16,7 +16,7 @@ ALGORITHM = os.getenv(
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv(
         "ACCESS_TOKEN_EXPIRE_MINUTES",
-        "15"
+        "150"
     )
 )
 

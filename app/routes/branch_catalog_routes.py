@@ -14,7 +14,7 @@ from app.constants import roles
 from app.schemas.branch_catalog_schema import (
     BranchCatalogProductResponse,
 )
-from app.constants.roles import CUSTOMER
+from app.constants.roles import CUSTOMER , SUPER_ADMIN , BRANCH_MANAGER
 
 from app.services.branch_catalog_service import (
     BranchCatalogService,
@@ -45,7 +45,9 @@ CurrentCustomer = Annotated[
     object,
     Depends(
         require_roles(
-            roles.CUSTOMER
+            roles.CUSTOMER,
+            roles.SUPER_ADMIN,
+            roles.BRANCH_MANAGER
         )
     ),
 ]
@@ -75,6 +77,8 @@ def get_branch_catalog(
     current_user=Depends(
             require_roles(
                 CUSTOMER,
+                SUPER_ADMIN,
+                BRANCH_MANAGER,
             )
         ),
 ):

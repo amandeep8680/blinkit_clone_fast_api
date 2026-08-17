@@ -1,73 +1,5602 @@
-const $=(q,s=document)=>s.querySelector(q), $$=(q,s=document)=>[...s.querySelectorAll(q)];
-const state={base:sessionStorage.getItem('blink_base')||'http://127.0.0.1:8000',access:sessionStorage.getItem('blink_access')||'',refresh:sessionStorage.getItem('blink_refresh')||'',user:JSON.parse(sessionStorage.getItem('blink_user')||'null'),spec:null,page:'overview',data:{},modal:null};
-const icons={overview:'⌂',branches:'⌘',managers:'♙',brands:'◆',categories:'▦',products:'◫',variants:'≋',images:'▧',inventory:'▥',customers:'♧',catalog:'⊞',console:'⌁',profile:'◎'};
-const navGroups=[['Workspace',[['overview','Overview'],['branches','Branches'],['inventory','Branch Inventory'],['catalog','Branch Catalog']]],['Catalog',[['brands','Brands'],['categories','Categories & Subcategories'],['products','Products'],['variants','Product Variants'],['images','Product Images']]],['People',[['managers','Branch Managers'],['customers','Customers']]],['System',[['profile','Admin Profile'],['console','API Console']]]];
-const modules={
- branches:{title:'Branches',list:'/branches/',create:'/branches/create',createSchema:'BranchCreate',updateSchema:'BranchUpdate',id:'unique_id',cols:['name','city','pincode','is_active','created_at']},
- managers:{title:'Branch Managers',list:'/branch-managers/all',create:'/branch-managers/create',createSchema:'BranchManagerCreate',updateSchema:'BranchManagerUpdate',base:'/branch-managers',id:'unique_id',cols:['name','email','role','is_active','created_at']},
- brands:{title:'Brands',list:'/brands',create:'/brands',createSchema:'BrandCreate',updateSchema:'BrandUpdate',base:'/brands',id:'unique_id',cols:['name','slug','is_active','created_at'],activatable:true},
- products:{title:'Products',list:'/products',create:'/products',createSchema:'ProductCreate',updateSchema:'ProductUpdate',base:'/products',id:'unique_id',cols:['name','slug','is_active','created_at'],activatable:true},
- variants:{title:'Product Variants',list:'/product-variants',create:'/product-variants',createSchema:'ProductVariantCreate',updateSchema:'ProductVariantUpdate',base:'/product-variants',id:'unique_id',cols:['sku','value','unit','mrp','selling_price','is_active'],activatable:true},
- images:{title:'Product Images',list:null,create:'/product-images',createSchema:'ProductImageCreate',updateSchema:'ProductImageUpdate',base:'/product-images',id:'unique_id',cols:['image_url','sort_order','is_primary','created_at']},
- customers:{title:'Customers',list:'/customers',create:null,updateSchema:'CustomerUpdate',base:'/customers',id:'unique_id',cols:['name','email','phone','is_active','created_at'],activatable:true}
+// ============================================================
+// DOM HELPERS
+// ============================================================
+
+const $ = (q, s = document) => s.querySelector(q);
+const $$ = (q, s = document) => [...s.querySelectorAll(q)];
+
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+
+const state = {
+  base:
+    sessionStorage.getItem("blink_base") ||
+    "http://127.0.0.1:8000",
+
+  access:
+    sessionStorage.getItem("blink_access") ||
+    "",
+
+  refresh:
+    sessionStorage.getItem("blink_refresh") ||
+    "",
+
+  user: JSON.parse(
+    sessionStorage.getItem("blink_user") || "null"
+  ),
+
+  spec: null,
+
+  page: "overview",
+
+  data: {},
+
+  // Related API data cache
+  // e.g. brands, products, branches, managers etc.
+  relations: {},
+
+  modal: null,
 };
-function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function getRole(){return (state.user?.role||jwtPayload(state.access)?.role||jwtPayload(state.access)?.user_role||'authenticated').toLowerCase()}
-function isAdmin(){return ['admin','super_admin','superadmin'].includes(getRole())}
-function jwtPayload(t){try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))}catch{return {}}}
-function saveSession(){sessionStorage.setItem('blink_base',state.base);sessionStorage.setItem('blink_access',state.access);sessionStorage.setItem('blink_refresh',state.refresh);sessionStorage.setItem('blink_user',JSON.stringify(state.user||null))}
-function toast(title,msg='',type=''){const e=document.createElement('div');e.className='toast '+type;e.innerHTML=`<div>${type==='error'?'!':'✓'}</div><div><b>${escapeHtml(title)}</b><span>${escapeHtml(msg)}</span></div>`;$('#toast-root').append(e);setTimeout(()=>e.remove(),4000)}
-async function api(path,opts={},retry=true){const headers={'Content-Type':'application/json',...(opts.headers||{})};if(state.access)headers.Authorization=`Bearer ${state.access}`;let r;try{r=await fetch(state.base.replace(/\/$/,'')+path,{...opts,headers})}catch(e){throw Object.assign(new Error('Network error. Check API URL / CORS / backend status.'),{status:0})}
- if(r.status===401&&retry&&state.refresh&&path!='/auth/refresh'){try{const rr=await fetch(state.base.replace(/\/$/,'')+'/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:state.refresh})});if(rr.ok){const x=await rr.json();state.access=x.access_token;saveSession();return api(path,opts,false)}}catch{}}
- let body=null;const txt=await r.text();try{body=txt?JSON.parse(txt):null}catch{body=txt};if(!r.ok){const detail=typeof body==='object'?(body?.detail||body?.message||JSON.stringify(body)):body;throw Object.assign(new Error(detail||`HTTP ${r.status}`),{status:r.status,body})}return body}
-async function loadSpec(){if(state.spec)return state.spec;const r=await fetch('openapi.json');state.spec=await r.json();return state.spec}
-async function login(e){e.preventDefault();state.base=$('#base-url').value.trim().replace(/\/$/,'');try{const x=await api('/auth/login',{method:'POST',body:JSON.stringify({email:$('#login-email').value.trim(),password:$('#login-password').value})},false);state.access=x.access_token;state.refresh=x.refresh_token;state.user=jwtPayload(state.access);try{state.user=await api('/admin/get')}catch(err){if(err.status!==401&&err.status!==403)console.warn(err)}saveSession();showApp();toast('Signed in',`Session started as ${getRole().replace('_',' ')}`)}catch(err){toast('Login failed',err.message,'error')}}
-async function showApp(){await loadSpec();$('#login-view').classList.add('hidden');$('#app-view').classList.remove('hidden');$('#api-host').textContent=state.base;setUserUI();renderNav();navigate('overview')}
-function setUserUI(){const p=state.user||jwtPayload(state.access);const email=p?.email||p?.sub||'Account';const name=p?.name||email.split('@')[0]||'Account';$('#user-name').textContent=name;$('#user-role').textContent=getRole().replaceAll('_',' ');$('#avatar').textContent=name[0]?.toUpperCase()||'A'}
-function renderNav(){let html='';for(const [label,items] of navGroups){html+=`<div class="nav-label">${label}</div>`;for(const [id,name] of items){const adminOnly=['managers','profile'].includes(id);html+=`<button class="nav-item" data-nav="${id}"><span class="nav-icon">${icons[id]}</span>${name}${adminOnly&&!isAdmin()?'<span class="nav-badge">Admin</span>':''}</button>`}}$('#nav').innerHTML=html;$$('[data-nav]').forEach(b=>b.onclick=()=>navigate(b.dataset.nav))}
-async function navigate(page){state.page=page;$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.nav===page));const names={overview:'Operations overview',categories:'Categories & subcategories',inventory:'Branch inventory',catalog:'Branch catalog',console:'API console',profile:'Admin profile'};$('#page-title').textContent=names[page]||modules[page]?.title||page;$('#crumb').textContent=page==='overview'?'Workspace':(Object.keys(modules).includes(page)?'Management':'Workspace');$('#content').innerHTML=`<div class="panel"><div class="panel-body"><div class="skeleton" style="width:35%"></div><br><div class="skeleton"></div><br><div class="skeleton" style="width:78%"></div></div></div>`;
- try{if(page==='overview')await renderOverview();else if(page==='categories')await renderCategories();else if(page==='inventory')await renderInventory();else if(page==='catalog')await renderCatalog();else if(page==='console')await renderConsole();else if(page==='profile')await renderProfile();else await renderCrud(page)}catch(err){handlePageError(err)}}
-function handlePageError(err){if([401,403].includes(err.status))return renderUnauthorized(err);$('#content').innerHTML=`<div class="panel"><div class="empty"><div class="big">⚠</div><b>Could not load this page</b><p>${escapeHtml(err.message)}</p><button class="secondary-btn" onclick="navigate(state.page)">Try again</button></div></div>`}
-function renderUnauthorized(err){$('#content').innerHTML=`<div class="unauthorized"><div><div class="lock">⌾</div><h3>Unauthorized access</h3><p>Your ${escapeHtml(getRole().replaceAll('_',' '))} account does not have permission for this protected operation. The backend returned HTTP ${err.status}. Sign in with an authorized Admin account or use a section assigned to your role.</p><button class="secondary-btn" onclick="navigate('overview')">Back to overview</button></div></div>`}
-async function safeCount(path){try{const x=await api(path);return Array.isArray(x)?x.length:(x?1:0)}catch(e){return e.status===403?'—':'—'}}
-async function renderOverview(){const [branches,products,customers,inventory]=await Promise.all([safeCount('/branches/'),safeCount('/products'),safeCount('/customers'),safeCount('/inventory')]);$('#content').innerHTML=`
-<div class="hero-panel"><div><span class="eyebrow">${isAdmin()?'ADMIN CONTROL CENTER':'BRANCH MANAGER WORKSPACE'}</span><h3>Good to see you, ${escapeHtml((state.user?.name||'operator').split(' ')[0])}.</h3><p>Live controls backed by your protected Blinkit Clone APIs.</p></div><div class="hero-actions"><button class="secondary-btn" onclick="navigate('console')">Open API console</button><button class="primary-btn" onclick="navigate('branches')">Manage branches</button></div></div>
-<div class="stat-grid">${stat('⌘','Branches',branches,'Network locations')}${stat('◫','Products',products,'Master catalog')}${stat('♧','Customers',customers,'Registered users')}${stat('▥','Inventory',inventory,'Branch stock rows')}</div>
-<div class="grid-2"><div class="panel"><div class="panel-head"><div><h3>Operations map</h3><p>Core backend areas available in this console</p></div></div><div class="panel-body"><div class="quick-grid">${quick('branches','⌘','Branch operations','Create, edit, assign manager')}${quick('categories','▦','Catalog structure','Categories and subcategories')}${quick('products','◫','Product master','Products, variants and images')}${quick('inventory','▥','Stock controls','Branch-level quantity & price')}</div></div></div><div class="panel"><div class="panel-head"><div><h3>Role & security</h3><p>Backend remains source of truth</p></div></div><div class="panel-body"><div class="activity-list"><div class="activity-row"><span class="activity-dot"></span><div><b>Bearer token attached</b><span>Protected calls use Authorization header</span></div></div><div class="activity-row"><span class="activity-dot"></span><div><b>Refresh flow enabled</b><span>401 attempts token refresh once</span></div></div><div class="activity-row"><span class="activity-dot"></span><div><b>403 handled safely</b><span>Unauthorized page instead of broken UI</span></div></div><div class="activity-row"><span class="activity-dot"></span><div><b>Current role: ${escapeHtml(getRole())}</b><span>JWT / admin profile derived</span></div></div></div></div></div></div>`}
-function stat(i,l,v,s){return `<div class="stat-card"><div class="stat-top"><span class="stat-icon">${i}</span><span class="trend">LIVE</span></div><h4>${escapeHtml(v)}</h4><small>${l}</small><span class="row-sub">${s}</span></div>`}function quick(p,i,b,s){return `<button class="quick-action" onclick="navigate('${p}')"><span class="stat-icon">${i}</span><b>${b}</b><span>${s}</span></button>`}
-async function renderCrud(key){const m=modules[key];if(!m)return;if(key==='images')return renderImages();const rows=await api(m.list);state.data[key]=rows;renderCrudTable(key,rows)}
-function renderCrudTable(key,rows){const m=modules[key];const create=!!m.create;const html=`<div class="toolbar"><div class="search"><input data-search="${key}" placeholder="Search ${m.title.toLowerCase()}..."></div><div class="toolbar-actions"><button class="secondary-btn" onclick="navigate('${key}')">↻ Refresh</button>${create?`<button class="primary-btn" onclick="openCreate('${key}')">＋ Add ${m.title.replace(/s$/,'')}</button>`:''}</div></div><div class="panel"><div class="panel-head"><div><h3>${m.title}</h3><p>${rows.length} record${rows.length===1?'':'s'} returned by the API</p></div></div><div class="table-wrap" id="table-${key}">${tableFor(key,rows)}</div></div>`;$('#content').innerHTML=html;const s=$(`[data-search="${key}"]`);if(s)s.oninput=()=>{const q=s.value.toLowerCase();const f=rows.filter(r=>JSON.stringify(r).toLowerCase().includes(q));$(`#table-${key}`).innerHTML=tableFor(key,f)}}
-function tableFor(key,rows){const m=modules[key];if(!rows.length)return `<div class="empty"><div class="big">◇</div><b>No records found</b><p>Create the first record or check the API response.</p></div>`;return `<table class="data-table"><thead><tr>${m.cols.map(c=>`<th>${c.replaceAll('_',' ')}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(r=>`<tr>${m.cols.map(c=>`<td>${cell(c,r[c],r)}</td>`).join('')}<td><div class="actions"><button class="action-btn" onclick='openEdit(${JSON.stringify(key)},${JSON.stringify(r[m.id])})'>Edit</button>${m.activatable?`<button class="action-btn" onclick='toggleActive(${JSON.stringify(key)},${JSON.stringify(r[m.id])},${!!r.is_active})'>${r.is_active?'Disable':'Activate'}</button>`:''}<button class="action-btn danger" onclick='removeRow(${JSON.stringify(key)},${JSON.stringify(r[m.id])})'>Delete</button></div></td></tr>`).join('')}</tbody></table>`}
-function cell(k,v,r){if(k==='is_active'||k==='is_available')return `<span class="badge ${v?'on':'off'}">● ${v?'Active':'Inactive'}</span>`;if(k==='role')return `<span class="badge role">${escapeHtml(v)}</span>`;if(k.includes('created_at')||k.includes('updated_at'))return v?new Date(v).toLocaleDateString():'—';if(k==='image_url'&&v)return `<a href="${escapeHtml(v)}" target="_blank">Image URL ↗</a>`;if(k==='name')return `<span class="row-title">${escapeHtml(v)}</span>${r.unique_id?`<span class="row-sub">${escapeHtml(r.unique_id)}</span>`:''}`;return escapeHtml(v??'—')}
-function schema(name){return state.spec?.components?.schemas?.[name]||{properties:{}}}
-function fieldType(def){const x=def.type?def:def.anyOf?.find(a=>a.type&&a.type!=='null')||{};return x.type==='boolean'?'boolean':x.type==='integer'?'number':x.type==='number'?'number':x.format==='email'?'email':x.format==='date-time'?'datetime-local':'text'}
-function formFields(schemaName,data={}){const s=schema(schemaName),required=new Set(s.required||[]);return Object.entries(s.properties||{}).map(([k,d])=>{const type=fieldType(d),val=data[k];const label=k.replaceAll('_',' ').replace(/\b\w/g,m=>m.toUpperCase());if(type==='boolean')return `<label class="field"><span>${label}${required.has(k)?' *':''}</span><select name="${k}"><option value="true" ${val===true?'selected':''}>Yes</option><option value="false" ${val===false?'selected':''}>No</option>${!required.has(k)?'<option value="">No change</option>':''}</select></label>`;return `<label class="field ${['description','address','image_url'].includes(k)?'full':''}"><span>${label}${required.has(k)?' *':''}</span><input name="${k}" type="${type}" value="${escapeHtml(val??'')}" ${required.has(k)?'required':''} placeholder="${label}"></label>`}).join('')}
-function openModal({title,kicker='ACTION',body,submit='Save changes',onSubmit}){state.modal={onSubmit};$('#modal-title').textContent=title;$('#modal-kicker').textContent=kicker;$('#modal-body').innerHTML=body;$('#modal-submit').textContent=submit;$('#modal').classList.remove('hidden')}
-function closeModal(){$('#modal').classList.add('hidden');state.modal=null}
-function formObject(form){const o={};new FormData(form).forEach((v,k)=>{if(v==='')return;const inp=form.elements[k];if(inp?.tagName==='SELECT'&&(v==='true'||v==='false'))o[k]=v==='true';else if(inp?.type==='number')o[k]=Number(v);else o[k]=v});return o}
-function openCreate(key){const m=modules[key];openModal({title:`Create ${m.title.replace(/s$/,'')}`,kicker:'NEW RECORD',body:formFields(m.createSchema),submit:'Create',onSubmit:async data=>{await api(m.create,{method:'POST',body:JSON.stringify(data)});toast('Created successfully');closeModal();navigate(key)}})}
-function openEdit(key,id){const m=modules[key],r=(state.data[key]||[]).find(x=>x[m.id]===id)||{};openModal({title:`Edit ${m.title.replace(/s$/,'')}`,kicker:'UPDATE RECORD',body:formFields(m.updateSchema,r),onSubmit:async data=>{const base=m.base||(key==='branches'?'/branches':'/'+key);await api(`${base}/${id}`,{method:'PATCH',body:JSON.stringify(data)});toast('Changes saved');closeModal();navigate(key)}})}
-async function toggleActive(key,id,current){const m=modules[key];try{await api(`${m.base}/${id}/${current?'deactivate':'activate'}`,{method:'PATCH'});toast(current?'Deactivated':'Activated');navigate(key)}catch(e){if([401,403].includes(e.status))renderUnauthorized(e);else toast('Action failed',e.message,'error')}}
-function removeRow(key,id){const m=modules[key],base=m.base||(key==='branches'?'/branches':'/'+key);openModal({title:'Confirm deletion',kicker:'DESTRUCTIVE ACTION',body:`<div class="danger-box full">This will call <b>DELETE ${escapeHtml(base+'/'+id)}</b>. This action may be permanent depending on your backend.</div>`,submit:'Delete permanently',onSubmit:async()=>{await api(`${base}/${id}`,{method:'DELETE'});toast('Record deleted');closeModal();navigate(key)}})}
-async function renderCategories(){const [cats,subs]=await Promise.all([api('/categories'),api('/subcategories')]);state.data.categories=cats;state.data.subcategories=subs;$('#content').innerHTML=`<div class="toolbar"><div class="search"><input id="cat-search" placeholder="Search category or subcategory..."></div><div class="toolbar-actions"><button class="secondary-btn" onclick="openSubcategory()">＋ Subcategory</button><button class="primary-btn" onclick="openCategory()">＋ Category</button></div></div><div class="catalog-layout"><div class="panel tree-panel"><div class="panel-head"><div><h3>Category tree</h3><p>${cats.length} categories · ${subs.length} subcategories</p></div></div><div class="panel-body">${cats.map(c=>`<div class="tree-item"><b>${escapeHtml(c.name)}</b><span>${subs.filter(s=>s.category_unique_id===c.unique_id).length}</span></div><div class="tree-sub">${subs.filter(s=>s.category_unique_id===c.unique_id).map(s=>`<div class="tree-item">↳ ${escapeHtml(s.name)}</div>`).join('')}</div>`).join('')}</div></div><div class="panel"><div class="panel-head"><div><h3>Categories</h3><p>Manage master grouping and nested subcategories</p></div></div><div class="table-wrap" id="cat-table">${categoryTable(cats,subs)}</div></div></div>`;$('#cat-search').oninput=e=>{const q=e.target.value.toLowerCase();$('#cat-table').innerHTML=categoryTable(cats.filter(c=>JSON.stringify(c).toLowerCase().includes(q)||subs.some(s=>s.category_unique_id===c.unique_id&&JSON.stringify(s).toLowerCase().includes(q))),subs)}}
-function categoryTable(cats,subs){if(!cats.length)return `<div class="empty"><b>No category found</b></div>`;return `<table class="data-table"><thead><tr><th>Category</th><th>Subcategories</th><th>Status</th><th>Actions</th></tr></thead><tbody>${cats.map(c=>`<tr><td><span class="row-title">${escapeHtml(c.name)}</span><span class="row-sub">/${escapeHtml(c.slug)}</span></td><td>${subs.filter(s=>s.category_unique_id===c.unique_id).map(s=>`<span class="badge role" style="margin-right:4px">${escapeHtml(s.name)}</span>`).join('')||'—'}</td><td>${cell('is_active',c.is_active,c)}</td><td><div class="actions"><button class="action-btn" onclick='openCategory(${JSON.stringify(c.unique_id)})'>Edit</button><button class="action-btn" onclick='viewSubcategories(${JSON.stringify(c.unique_id)})'>View nested</button><button class="action-btn danger" onclick='deleteCategory(${JSON.stringify(c.unique_id)})'>Delete</button></div></td></tr>`).join('')}</tbody></table>`}
-function openCategory(id=null){const c=(state.data.categories||[]).find(x=>x.unique_id===id)||{};openModal({title:id?'Edit category':'Create category',body:formFields(id?'CategoryUpdate':'CategoryCreate',c),submit:id?'Save changes':'Create',onSubmit:async d=>{await api(id?`/categories/${id}`:'/categories',{method:id?'PATCH':'POST',body:JSON.stringify(d)});toast(id?'Category updated':'Category created');closeModal();navigate('categories')}})}
-function openSubcategory(id=null){const s=(state.data.subcategories||[]).find(x=>x.unique_id===id)||{};openModal({title:id?'Edit subcategory':'Create subcategory',body:formFields(id?'SubCategoryUpdate':'SubCategoryCreate',s),submit:id?'Save changes':'Create',onSubmit:async d=>{await api(id?`/subcategories/${id}`:'/subcategories',{method:id?'PATCH':'POST',body:JSON.stringify(d)});toast('Subcategory saved');closeModal();navigate('categories')}})}
-async function viewSubcategories(id){try{const x=await api(`/categories/${id}/subcategories`);openModal({title:'Category details',kicker:'NESTED SUBCATEGORIES',body:`<div class="full"><pre style="white-space:pre-wrap;font-size:11px;background:#f6f8f6;padding:14px;border-radius:12px">${escapeHtml(JSON.stringify(x,null,2))}</pre></div>`,submit:'Close',onSubmit:async()=>closeModal()})}catch(e){toast('Could not load',e.message,'error')}}
-function deleteCategory(id){openModal({title:'Delete category',kicker:'DESTRUCTIVE ACTION',body:`<div class="danger-box full">Delete category <b>${escapeHtml(id)}</b>? The backend will decide whether linked subcategories/products prevent deletion.</div>`,submit:'Delete',onSubmit:async()=>{await api(`/categories/${id}`,{method:'DELETE'});closeModal();navigate('categories')}})}
-async function renderInventory(){const rows=await api('/inventory');state.data.inventory=rows;$('#content').innerHTML=`<div class="toolbar"><div class="search"><input id="inv-search" placeholder="Search inventory response..."></div><div class="toolbar-actions"><button class="secondary-btn" onclick="openStockAction()">± Adjust stock</button><button class="primary-btn" onclick="openInventoryCreate()">＋ Add inventory</button></div></div><div class="panel"><div class="panel-head"><div><h3>Branch inventory</h3><p>${rows.length} inventory rows</p></div></div><div class="table-wrap" id="inv-table">${inventoryTable(rows)}</div></div>`;$('#inv-search').oninput=e=>{const q=e.target.value.toLowerCase();$('#inv-table').innerHTML=inventoryTable(rows.filter(r=>JSON.stringify(r).toLowerCase().includes(q)))}}
-function inventoryTable(rows){if(!rows.length)return `<div class="empty"><div class="big">▥</div><b>No inventory rows</b><p>Add a branch/product variant mapping to start managing stock.</p></div>`;const keys=['stock_quantity','selling_price_override','is_available','created_at','updated_at'];return `<table class="data-table"><thead><tr>${keys.map(k=>`<th>${k.replaceAll('_',' ')}</th>`).join('')}<th>Raw</th></tr></thead><tbody>${rows.map(r=>`<tr>${keys.map(k=>`<td>${cell(k,r[k],r)}</td>`).join('')}<td><button class="action-btn" onclick='showRaw(${JSON.stringify(r)})'>View</button></td></tr>`).join('')}</tbody></table>`}
-function openInventoryCreate(){openModal({title:'Add branch inventory',body:formFields('BranchInventoryCreate'),submit:'Create inventory',onSubmit:async d=>{await api('/inventory',{method:'POST',body:JSON.stringify(d)});toast('Inventory created');closeModal();navigate('inventory')}})}
-function openStockAction(){openModal({title:'Adjust stock',kicker:'INCREASE / DECREASE',body:`<label class="field"><span>Branch Unique ID *</span><input name="branch_unique_id" required></label><label class="field"><span>Variant Unique ID *</span><input name="product_variant_unique_id" required></label><label class="field"><span>Quantity *</span><input name="quantity" type="number" min="1" required></label><label class="field"><span>Action</span><select name="action"><option value="increase-stock">Increase stock</option><option value="decrease-stock">Decrease stock</option></select></label>`,submit:'Apply stock change',onSubmit:async d=>{const p=`/inventory/branch/${encodeURIComponent(d.branch_unique_id)}/variant/${encodeURIComponent(d.product_variant_unique_id)}/${d.action}`;await api(p,{method:'PATCH',body:JSON.stringify({quantity:Number(d.quantity)})});toast('Stock updated');closeModal();navigate('inventory')}})}
-async function renderCatalog(){const branches=await api('/branches/');state.data.branches=branches;$('#content').innerHTML=`<div class="toolbar"><div><b style="font:800 16px Manrope">Branch catalog preview</b><span class="row-sub">Select a branch to call /branch-catalog/{branch_unique_id}</span></div><div class="toolbar-actions"><select id="catalog-branch" style="padding:11px;border:1px solid var(--line);border-radius:10px"><option value="">Choose branch…</option>${branches.map(b=>`<option value="${escapeHtml(b.unique_id)}">${escapeHtml(b.name)} — ${escapeHtml(b.city)}</option>`).join('')}</select></div></div><div id="catalog-content" class="panel"><div class="empty"><div class="big">⊞</div><b>Select a branch</b><p>Products, brand, subcategory, images and variants returned by the branch catalog API will appear here.</p></div></div>`;$('#catalog-branch').onchange=async e=>{if(!e.target.value)return;const box=$('#catalog-content');box.innerHTML='<div class="panel-body"><div class="skeleton"></div><br><div class="skeleton"></div></div>';try{const rows=await api(`/branch-catalog/${encodeURIComponent(e.target.value)}`);box.innerHTML=`<div class="panel-head"><div><h3>Available catalog</h3><p>${rows.length} products returned</p></div></div><div class="panel-body"><div class="product-grid">${rows.map(p=>`<div class="product-card"><div class="product-img">${p.images?.[0]?.image_url?`<img src="${escapeHtml(p.images[0].image_url)}" alt="">`:'◫'}</div><div class="product-info"><h4>${escapeHtml(p.name)}</h4><p>${escapeHtml(p.brand?.name||'No brand')} · ${escapeHtml(p.subcategory?.name||'No subcategory')}</p><div class="product-foot"><span class="badge on">${p.variants?.length||0} variants</span><button class="action-btn" onclick='showRaw(${JSON.stringify(p)})'>Details</button></div></div></div>`).join('')}</div></div>`}catch(err){box.innerHTML='';handlePageError(err)}}}
-async function renderImages(){const body=`<div class="toolbar"><div><b style="font:800 16px Manrope">Product images</b><span class="row-sub">Image listing API requires a product_unique_id.</span></div><div class="toolbar-actions"><button class="primary-btn" onclick="openCreate('images')">＋ Add image</button></div></div><div class="panel"><div class="panel-body"><div style="display:flex;gap:8px"><input id="img-product-id" style="flex:1;padding:11px;border:1px solid var(--line);border-radius:10px" placeholder="Enter product unique id"><button id="load-images" class="secondary-btn">Load images</button></div></div><div id="images-result"></div></div>`;$('#content').innerHTML=body;$('#load-images').onclick=async()=>{const id=$('#img-product-id').value.trim();if(!id)return;try{const rows=await api(`/product-images/product/${encodeURIComponent(id)}`);state.data.images=rows;$('#images-result').innerHTML=`<div class="table-wrap">${tableFor('images',rows)}</div>`}catch(e){handlePageError(e)}}}
-async function renderProfile(){try{const p=await api('/admin/get');state.user=p;saveSession();setUserUI();$('#content').innerHTML=`<div class="grid-2"><div class="panel"><div class="panel-head"><div><h3>Super Admin profile</h3><p>GET /admin/get</p></div><button class="primary-btn" onclick='editAdmin(${JSON.stringify(p)})'>Edit profile</button></div><div class="panel-body"><div class="activity-list">${Object.entries(p).map(([k,v])=>`<div class="activity-row"><span class="activity-dot"></span><div><b>${escapeHtml(k.replaceAll('_',' '))}</b><span>${escapeHtml(v)}</span></div></div>`).join('')}</div></div></div><div class="panel"><div class="panel-head"><div><h3>Danger zone</h3><p>Protected admin actions</p></div></div><div class="panel-body"><div class="danger-box">Deleting the Super Admin can lock you out of protected administrative APIs.</div><br><button class="secondary-btn" style="color:#b3453f" onclick="deleteAdmin()">Delete Super Admin</button></div></div></div>`}catch(e){handlePageError(e)}}
-function editAdmin(p){openModal({title:'Edit Super Admin',body:formFields('UserUpdate',{name:p.name,updated_at:new Date().toISOString().slice(0,16)}),onSubmit:async d=>{if(d.updated_at)d.updated_at=new Date(d.updated_at).toISOString();await api('/admin/update',{method:'PATCH',body:JSON.stringify(d)});toast('Admin updated');closeModal();navigate('profile')}})}
-function deleteAdmin(){openModal({title:'Delete Super Admin',kicker:'DANGER ZONE',body:'<div class="danger-box full">This calls DELETE /admin/delete. Make sure you understand your backend lifecycle before continuing.</div>',submit:'Delete Admin',onSubmit:async()=>{await api('/admin/delete',{method:'DELETE'});logout()}})}
-async function renderConsole(){const spec=await loadSpec();const groups={};for(const [path,ops] of Object.entries(spec.paths)){for(const [method,op] of Object.entries(ops)){if(!['get','post','patch','delete','put'].includes(method))continue;const tag=(op.tags||['Other'])[0];(groups[tag]??=[]).push({path,method,op})}}$('#content').innerHTML=`<div class="toolbar"><div class="search"><input id="api-search" placeholder="Search all ${Object.values(groups).flat().length} API operations..."></div><div class="toolbar-actions"><span class="badge role">OpenAPI ${escapeHtml(spec.openapi)}</span></div></div><div id="api-groups">${consoleGroups(groups)}</div>`;$('#api-search').oninput=e=>{const q=e.target.value.toLowerCase();const g={};for(const [tag,arr] of Object.entries(groups)){const f=arr.filter(x=>(x.path+' '+x.method+' '+x.op.summary+' '+tag).toLowerCase().includes(q));if(f.length)g[tag]=f}$('#api-groups').innerHTML=consoleGroups(g)}}
-function consoleGroups(groups){return Object.entries(groups).map(([tag,rows])=>`<div class="panel api-group"><div class="panel-head"><div><h3>${escapeHtml(tag)}</h3><p>${rows.length} operations</p></div></div>${rows.map(x=>`<div class="api-row"><span class="method ${x.method}">${x.method.toUpperCase()}</span><div><span class="api-path">${escapeHtml(x.path)}</span><span class="api-summary">${escapeHtml(x.op.summary||'')}</span></div><button class="action-btn" onclick='invokeApi(${JSON.stringify(x.path)},${JSON.stringify(x.method)},${JSON.stringify(x.op.requestBody?.content?.["application/json"]?.schema?.$ref?.split("/").pop()||"")})'>Run</button></div>`).join('')}</div>`).join('')||'<div class="empty"><b>No API operation matched</b></div>'}
-function invokeApi(path,method,schemaName){const params=[...path.matchAll(/\{([^}]+)\}/g)].map(m=>m[1]);const paramFields=params.map(p=>`<label class="field"><span>${p.replaceAll('_',' ')} *</span><input name="path_${p}" required></label>`).join('');const query='';const body=schemaName?formFields(schemaName):'';openModal({title:`${method.toUpperCase()} ${path}`,kicker:'API CONSOLE',body:paramFields+body+(body?'':'<div class="full muted" style="font-size:11px">This operation has no JSON request body in the OpenAPI schema.</div>'),submit:'Run request',onSubmit:async d=>{let p=path;for(const name of params){p=p.replace(`{${name}}`,encodeURIComponent(d[`path_${name}`]));delete d[`path_${name}`]}const opts={method:method.toUpperCase()};if(!['GET','DELETE'].includes(opts.method)&&Object.keys(d).length)opts.body=JSON.stringify(d);try{const res=await api(p,opts);$('#modal-body').innerHTML=`<div class="full"><pre style="white-space:pre-wrap;max-height:55vh;overflow:auto;font-size:11px;background:#f6f8f6;padding:14px;border-radius:12px">${escapeHtml(JSON.stringify(res,null,2))}</pre></div>`;$('#modal-submit').textContent='Close';state.modal.onSubmit=async()=>closeModal()}catch(e){if([401,403].includes(e.status)){closeModal();renderUnauthorized(e)}else toast('API request failed',e.message,'error')}}})}
-function showRaw(x){openModal({title:'Record details',kicker:'RAW API RESPONSE',body:`<div class="full"><pre style="white-space:pre-wrap;max-height:60vh;overflow:auto;font-size:11px;background:#f6f8f6;padding:14px;border-radius:12px">${escapeHtml(JSON.stringify(x,null,2))}</pre></div>`,submit:'Close',onSubmit:async()=>closeModal()})}
-function logout(){sessionStorage.removeItem('blink_access');sessionStorage.removeItem('blink_refresh');sessionStorage.removeItem('blink_user');state.access='';state.refresh='';state.user=null;$('#app-view').classList.add('hidden');$('#login-view').classList.remove('hidden')}
-$('#login-form').addEventListener('submit',login);$('#base-url').value=state.base;$('#toggle-password').onclick=()=>{$('#login-password').type=$('#login-password').type==='password'?'text':'password'};$('#logout-btn').onclick=logout;$('#refresh-page').onclick=()=>navigate(state.page);$('#menu-btn').onclick=()=>$('#sidebar').classList.toggle('open');$$('[data-close-modal]').forEach(x=>x.onclick=closeModal);$('#modal-form').onsubmit=async e=>{e.preventDefault();if(!state.modal?.onSubmit)return;const btn=$('#modal-submit'),old=btn.textContent;btn.disabled=true;btn.textContent='Working…';try{await state.modal.onSubmit(formObject(e.target))}catch(err){if([401,403].includes(err.status)){closeModal();renderUnauthorized(err)}else toast('Request failed',err.message,'error')}finally{btn.disabled=false;if($('#modal').classList.contains('hidden')===false)btn.textContent=old}};
-if(state.access)showApp();
+
+
+// ============================================================
+// ICONS
+// ============================================================
+
+const icons = {
+  overview: "⌂",
+  branches: "⌘",
+  managers: "♙",
+  brands: "◆",
+  categories: "▦",
+  products: "◫",
+  variants: "≋",
+  images: "▧",
+  inventory: "▥",
+  customers: "♧",
+  catalog: "⊞",
+  console: "⌁",
+  profile: "◎",
+};
+
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+
+const navGroups = [
+  [
+    "Workspace",
+    [
+      ["overview", "Overview"],
+      ["branches", "Branches"],
+      ["inventory", "Branch Inventory"],
+      ["catalog", "Branch Catalog"],
+    ],
+  ],
+
+  [
+    "Catalog",
+    [
+      ["brands", "Brands"],
+      ["categories", "Categories & Subcategories"],
+      ["products", "Products"],
+      ["variants", "Product Variants"],
+      ["images", "Product Images"],
+    ],
+  ],
+
+  [
+    "People",
+    [
+      ["managers", "Branch Managers"],
+      ["customers", "Customers"],
+    ],
+  ],
+
+  [
+    "System",
+    [
+      ["profile", "Admin Profile"],
+      ["console", "API Console"],
+    ],
+  ],
+];
+
+
+// ============================================================
+// CRUD MODULE CONFIG
+// ============================================================
+
+const modules = {
+  branches: {
+    title: "Branches",
+    list: "/branches/",
+    create: "/branches/create",
+    createSchema: "BranchCreate",
+    updateSchema: "BranchUpdate",
+    id: "unique_id",
+
+    cols: [
+      "name",
+      "city",
+      "pincode",
+      "is_active",
+      "created_at",
+    ],
+  },
+
+  managers: {
+    title: "Branch Managers",
+    list: "/branch-managers/all",
+    create: "/branch-managers/create",
+    createSchema: "BranchManagerCreate",
+    updateSchema: "BranchManagerUpdate",
+    base: "/branch-managers",
+    id: "unique_id",
+
+    cols: [
+      "name",
+      "email",
+      "role",
+      "is_active",
+      "created_at",
+    ],
+  },
+
+  brands: {
+    title: "Brands",
+    list: "/brands",
+    create: "/brands",
+    createSchema: "BrandCreate",
+    updateSchema: "BrandUpdate",
+    base: "/brands",
+    id: "unique_id",
+
+    cols: [
+      "name",
+      "slug",
+      "is_active",
+      "created_at",
+    ],
+
+    activatable: true,
+  },
+
+  products: {
+    title: "Products",
+    list: "/products",
+    create: "/products",
+    createSchema: "ProductCreate",
+    updateSchema: "ProductUpdate",
+    base: "/products",
+    id: "unique_id",
+
+    cols: [
+      "name",
+      "slug",
+      "is_active",
+      "created_at",
+    ],
+
+    activatable: true,
+  },
+
+  variants: {
+    title: "Product Variants",
+    list: "/product-variants",
+    create: "/product-variants",
+    createSchema: "ProductVariantCreate",
+    updateSchema: "ProductVariantUpdate",
+    base: "/product-variants",
+    id: "unique_id",
+
+    cols: [
+      "sku",
+      "value",
+      "unit",
+      "mrp",
+      "selling_price",
+      "is_active",
+    ],
+
+    activatable: true,
+  },
+
+  images: {
+    title: "Product Images",
+    list: null,
+    create: "/product-images",
+    createSchema: "ProductImageCreate",
+    updateSchema: "ProductImageUpdate",
+    base: "/product-images",
+    id: "unique_id",
+
+    cols: [
+      "image_url",
+      "sort_order",
+      "is_primary",
+      "created_at",
+    ],
+  },
+
+  customers: {
+    title: "Customers",
+    list: "/customers",
+    create: null,
+    updateSchema: "CustomerUpdate",
+    base: "/customers",
+    id: "unique_id",
+
+    cols: [
+      "name",
+      "email",
+      "phone",
+      "is_active",
+      "created_at",
+    ],
+
+    activatable: true,
+  },
+};
+
+
+// ============================================================
+// RELATION CONFIG
+//
+// IMPORTANT:
+// agar form me ye fields aaye,
+// raw UUID input ki jagah GET API call karke dropdown banega.
+// ============================================================
+
+const relationConfig = {
+  brand_unique_id: {
+    cache: "brands",
+    path: "/brands/active",
+    placeholder: "Choose brand",
+    label: (x) =>
+      x.slug
+        ? `${x.name} — ${x.slug}`
+        : x.name,
+  },
+
+  category_unique_id: {
+    cache: "categories",
+    path: "/categories/active",
+    placeholder: "Choose category",
+    label: (x) =>
+      x.slug
+        ? `${x.name} — ${x.slug}`
+        : x.name,
+  },
+
+  subcategory_unique_id: {
+    cache: "subcategories",
+    path: "/subcategories/active",
+    placeholder: "Choose subcategory",
+    label: (x) =>
+      x.slug
+        ? `${x.name} — ${x.slug}`
+        : x.name,
+  },
+
+  product_unique_id: {
+    cache: "products",
+    path: "/products/active",
+    placeholder: "Choose product",
+    label: (x) =>
+      x.slug
+        ? `${x.name} — ${x.slug}`
+        : x.name,
+  },
+
+  product_variant_unique_id: {
+    cache: "variants",
+    path: "/product-variants",
+    placeholder: "Choose product variant",
+
+    label: (x) => {
+      const size = [
+        x.value,
+        x.unit,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      return [
+        x.sku,
+        size,
+        x.selling_price
+          ? `₹${x.selling_price}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" — ");
+    },
+  },
+
+  branch_unique_id: {
+    cache: "branches",
+    path: "/branches/",
+    placeholder: "Choose branch",
+
+    label: (x) =>
+      [
+        x.name,
+        x.city,
+        x.pincode,
+      ]
+        .filter(Boolean)
+        .join(" — "),
+  },
+
+  manager_unique_id: {
+    cache: "managers",
+    path: "/branch-managers/all",
+    placeholder: "Choose branch manager",
+
+    label: (x) => {
+      const assignedBranch =
+        x.branch?.name
+          ? ` • ${x.branch.name}`
+          : "";
+
+      return `${x.name} — ${x.email}${assignedBranch}`;
+    },
+  },
+};
+
+
+// ============================================================
+// BASIC HELPERS
+// ============================================================
+
+function escapeHtml(v) {
+  return String(v ?? "").replace(
+    /[&<>'"]/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+      })[c]
+  );
+}
+
+
+function getRole() {
+  return (
+    state.user?.role ||
+    jwtPayload(state.access)?.role ||
+    jwtPayload(state.access)?.user_role ||
+    "authenticated"
+  ).toLowerCase();
+}
+
+
+function isAdmin() {
+  return [
+    "admin",
+    "super_admin",
+    "superadmin",
+  ].includes(getRole());
+}
+
+
+function jwtPayload(token) {
+  try {
+    const payload = token
+      .split(".")[1]
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    return JSON.parse(atob(payload));
+  } catch {
+    return {};
+  }
+}
+
+
+function saveSession() {
+  sessionStorage.setItem(
+    "blink_base",
+    state.base
+  );
+
+  sessionStorage.setItem(
+    "blink_access",
+    state.access
+  );
+
+  sessionStorage.setItem(
+    "blink_refresh",
+    state.refresh
+  );
+
+  sessionStorage.setItem(
+    "blink_user",
+    JSON.stringify(state.user || null)
+  );
+}
+
+
+function toast(
+  title,
+  msg = "",
+  type = ""
+) {
+  const e = document.createElement("div");
+
+  e.className = "toast " + type;
+
+  e.innerHTML = `
+    <div>
+      ${type === "error" ? "!" : "✓"}
+    </div>
+
+    <div>
+      <b>${escapeHtml(title)}</b>
+      <span>${escapeHtml(msg)}</span>
+    </div>
+  `;
+
+  $("#toast-root").append(e);
+
+  setTimeout(
+    () => e.remove(),
+    4000
+  );
+}
+
+
+// ============================================================
+// API HELPER
+// ============================================================
+
+async function api(
+  path,
+  opts = {},
+  retry = true
+) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(opts.headers || {}),
+  };
+
+  if (state.access) {
+    headers.Authorization =
+      `Bearer ${state.access}`;
+  }
+
+  let response;
+
+  try {
+    response = await fetch(
+      state.base.replace(/\/$/, "") + path,
+      {
+        ...opts,
+        headers,
+      }
+    );
+  } catch (e) {
+    throw Object.assign(
+      new Error(
+        "Network error. Check API URL / CORS / backend status."
+      ),
+      {
+        status: 0,
+      }
+    );
+  }
+
+
+  // -----------------------------------------
+  // Refresh access token
+  // -----------------------------------------
+
+  if (
+    response.status === 401 &&
+    retry &&
+    state.refresh &&
+    path !== "/auth/refresh"
+  ) {
+    try {
+      const rr = await fetch(
+        state.base.replace(/\/$/, "") +
+          "/auth/refresh",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            refresh_token:
+              state.refresh,
+          }),
+        }
+      );
+
+      if (rr.ok) {
+        const x = await rr.json();
+
+        state.access =
+          x.access_token;
+
+        if (x.refresh_token) {
+          state.refresh =
+            x.refresh_token;
+        }
+
+        saveSession();
+
+        return api(
+          path,
+          opts,
+          false
+        );
+      }
+    } catch {}
+  }
+
+
+  let body = null;
+
+  const text =
+    await response.text();
+
+  try {
+    body = text
+      ? JSON.parse(text)
+      : null;
+  } catch {
+    body = text;
+  }
+
+
+  if (!response.ok) {
+    const detail =
+      typeof body === "object"
+        ? (
+            body?.detail ||
+            body?.message ||
+            JSON.stringify(body)
+          )
+        : body;
+
+    throw Object.assign(
+      new Error(
+        detail ||
+        `HTTP ${response.status}`
+      ),
+      {
+        status:
+          response.status,
+
+        body,
+      }
+    );
+  }
+
+  return body;
+}
+
+
+// ============================================================
+// OPENAPI
+// ============================================================
+
+async function loadSpec() {
+  if (state.spec) {
+    return state.spec;
+  }
+
+  const response =
+    await fetch("openapi.json");
+
+  state.spec =
+    await response.json();
+
+  return state.spec;
+}
+
+
+// ============================================================
+// RELATION LOADER
+// ============================================================
+
+async function loadRelation(
+  fieldName,
+  force = false
+) {
+  const config =
+    relationConfig[fieldName];
+
+  if (!config) {
+    return [];
+  }
+
+  if (
+    !force &&
+    Array.isArray(
+      state.relations[config.cache]
+    )
+  ) {
+    return state.relations[
+      config.cache
+    ];
+  }
+
+  try {
+    const rows =
+      await api(config.path);
+
+    state.relations[
+      config.cache
+    ] = Array.isArray(rows)
+      ? rows
+      : [];
+
+    return state.relations[
+      config.cache
+    ];
+  } catch (err) {
+    console.warn(
+      `Could not load relation ${fieldName}`,
+      err
+    );
+
+    return [];
+  }
+}
+
+
+// ============================================================
+// LOAD RELATIONS REQUIRED BY A SCHEMA
+// ============================================================
+
+async function prepareRelationsForSchema(
+  schemaName
+) {
+  const s =
+    schema(schemaName);
+
+  const fields =
+    Object.keys(
+      s.properties || {}
+    );
+
+  const relationFields =
+    fields.filter(
+      (field) =>
+        relationConfig[field]
+    );
+
+  await Promise.all(
+    relationFields.map(
+      (field) =>
+        loadRelation(field)
+    )
+  );
+}
+
+
+// ============================================================
+// LOGIN
+// ============================================================
+
+async function login(e) {
+  e.preventDefault();
+
+  state.base =
+    $("#base-url")
+      .value
+      .trim()
+      .replace(/\/$/, "");
+
+  try {
+    const result =
+      await api(
+        "/auth/login",
+        {
+          method: "POST",
+
+          body: JSON.stringify({
+            email:
+              $("#login-email")
+                .value
+                .trim(),
+
+            password:
+              $("#login-password")
+                .value,
+          }),
+        },
+        false
+      );
+
+    state.access =
+      result.access_token;
+
+    state.refresh =
+      result.refresh_token;
+
+    state.user =
+      jwtPayload(
+        state.access
+      );
+
+
+    // Try admin profile
+    try {
+      state.user =
+        await api(
+          "/admin/get"
+        );
+    } catch (err) {
+      if (
+        err.status !== 401 &&
+        err.status !== 403
+      ) {
+        console.warn(err);
+      }
+    }
+
+    saveSession();
+
+    await showApp();
+
+    toast(
+      "Signed in",
+      `Session started as ${getRole().replaceAll("_", " ")}`
+    );
+  } catch (err) {
+    toast(
+      "Login failed",
+      err.message,
+      "error"
+    );
+  }
+}
+
+
+// ============================================================
+// SHOW APP
+// ============================================================
+
+async function showApp() {
+  await loadSpec();
+
+  $("#login-view")
+    .classList
+    .add("hidden");
+
+  $("#app-view")
+    .classList
+    .remove("hidden");
+
+  $("#api-host")
+    .textContent =
+    state.base;
+
+  setUserUI();
+
+  renderNav();
+
+  navigate("overview");
+}
+
+
+// ============================================================
+// USER UI
+// ============================================================
+
+function setUserUI() {
+  const profile =
+    state.user ||
+    jwtPayload(
+      state.access
+    );
+
+  const email =
+    profile?.email ||
+    profile?.sub ||
+    "Account";
+
+  const name =
+    profile?.name ||
+    email.split("@")[0] ||
+    "Account";
+
+  $("#user-name")
+    .textContent =
+    name;
+
+  $("#user-role")
+    .textContent =
+    getRole()
+      .replaceAll(
+        "_",
+        " "
+      );
+
+  $("#avatar")
+    .textContent =
+    name[0]
+      ?.toUpperCase() ||
+    "A";
+}
+
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+
+function renderNav() {
+  let html = "";
+
+  for (
+    const [label, items]
+    of navGroups
+  ) {
+    html += `
+      <div class="nav-label">
+        ${label}
+      </div>
+    `;
+
+    for (
+      const [id, name]
+      of items
+    ) {
+      const adminOnly =
+        [
+          "managers",
+          "profile",
+        ].includes(id);
+
+      html += `
+        <button
+          class="nav-item"
+          data-nav="${id}"
+        >
+          <span class="nav-icon">
+            ${icons[id]}
+          </span>
+
+          ${name}
+
+          ${
+            adminOnly &&
+            !isAdmin()
+              ? `
+                <span class="nav-badge">
+                  Admin
+                </span>
+              `
+              : ""
+          }
+        </button>
+      `;
+    }
+  }
+
+  $("#nav")
+    .innerHTML =
+    html;
+
+  $$("[data-nav]")
+    .forEach(
+      (button) => {
+        button.onclick =
+          () =>
+            navigate(
+              button.dataset.nav
+            );
+      }
+    );
+}
+
+
+// ============================================================
+// NAVIGATE
+// ============================================================
+
+async function navigate(page) {
+  state.page = page;
+
+  $$(".nav-item")
+    .forEach(
+      (x) =>
+        x.classList.toggle(
+          "active",
+          x.dataset.nav === page
+        )
+    );
+
+
+  const names = {
+    overview:
+      "Operations overview",
+
+    categories:
+      "Categories & subcategories",
+
+    inventory:
+      "Branch inventory",
+
+    catalog:
+      "Branch catalog",
+
+    console:
+      "API console",
+
+    profile:
+      "Admin profile",
+  };
+
+
+  $("#page-title")
+    .textContent =
+    names[page] ||
+    modules[page]?.title ||
+    page;
+
+
+  $("#crumb")
+    .textContent =
+    page === "overview"
+      ? "Workspace"
+      : (
+          Object.keys(
+            modules
+          ).includes(page)
+            ? "Management"
+            : "Workspace"
+        );
+
+
+  $("#content")
+    .innerHTML = `
+      <div class="panel">
+        <div class="panel-body">
+          <div
+            class="skeleton"
+            style="width:35%"
+          ></div>
+
+          <br>
+
+          <div
+            class="skeleton"
+          ></div>
+
+          <br>
+
+          <div
+            class="skeleton"
+            style="width:78%"
+          ></div>
+        </div>
+      </div>
+    `;
+
+
+  try {
+    if (
+      page === "overview"
+    ) {
+      await renderOverview();
+    }
+
+    else if (
+      page === "categories"
+    ) {
+      await renderCategories();
+    }
+
+    else if (
+      page === "inventory"
+    ) {
+      await renderInventory();
+    }
+
+    else if (
+      page === "catalog"
+    ) {
+      await renderCatalog();
+    }
+
+    else if (
+      page === "console"
+    ) {
+      await renderConsole();
+    }
+
+    else if (
+      page === "profile"
+    ) {
+      await renderProfile();
+    }
+
+    else {
+      await renderCrud(page);
+    }
+
+  } catch (err) {
+    handlePageError(err);
+  }
+}
+
+
+// ============================================================
+// ERRORS
+// ============================================================
+
+function handlePageError(err) {
+  if (
+    [401, 403]
+      .includes(
+        err.status
+      )
+  ) {
+    return renderUnauthorized(
+      err
+    );
+  }
+
+  $("#content")
+    .innerHTML = `
+      <div class="panel">
+        <div class="empty">
+
+          <div class="big">
+            ⚠
+          </div>
+
+          <b>
+            Could not load this page
+          </b>
+
+          <p>
+            ${escapeHtml(
+              err.message
+            )}
+          </p>
+
+          <button
+            class="secondary-btn"
+            onclick="navigate(state.page)"
+          >
+            Try again
+          </button>
+
+        </div>
+      </div>
+    `;
+}
+
+
+function renderUnauthorized(err) {
+  $("#content")
+    .innerHTML = `
+      <div class="unauthorized">
+        <div>
+
+          <div class="lock">
+            ⌾
+          </div>
+
+          <h3>
+            Unauthorized access
+          </h3>
+
+          <p>
+            Your
+            ${escapeHtml(
+              getRole()
+                .replaceAll(
+                  "_",
+                  " "
+                )
+            )}
+            account does not
+            have permission for
+            this protected
+            operation.
+
+            The backend returned
+            HTTP ${err.status}.
+          </p>
+
+          <button
+            class="secondary-btn"
+            onclick="navigate('overview')"
+          >
+            Back to overview
+          </button>
+
+        </div>
+      </div>
+    `;
+}
+
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+
+async function safeCount(path) {
+  try {
+    const result =
+      await api(path);
+
+    return Array.isArray(
+      result
+    )
+      ? result.length
+      : result
+        ? 1
+        : 0;
+
+  } catch {
+    return "—";
+  }
+}
+
+
+async function renderOverview() {
+  const [
+    branches,
+    products,
+    customers,
+    inventory,
+  ] = await Promise.all([
+    safeCount("/branches/"),
+    safeCount("/products"),
+    safeCount("/customers"),
+    safeCount("/inventory"),
+  ]);
+
+
+  $("#content")
+    .innerHTML = `
+      <div class="hero-panel">
+
+        <div>
+
+          <span class="eyebrow">
+            ${
+              isAdmin()
+                ? "ADMIN CONTROL CENTER"
+                : "BRANCH MANAGER WORKSPACE"
+            }
+          </span>
+
+          <h3>
+            Good to see you,
+            ${escapeHtml(
+              (
+                state.user?.name ||
+                "operator"
+              )
+                .split(" ")[0]
+            )}.
+          </h3>
+
+          <p>
+            Live controls backed by
+            your protected Blinkit
+            Clone APIs.
+          </p>
+
+        </div>
+
+        <div class="hero-actions">
+
+          <button
+            class="secondary-btn"
+            onclick="navigate('console')"
+          >
+            Open API console
+          </button>
+
+          <button
+            class="primary-btn"
+            onclick="navigate('branches')"
+          >
+            Manage branches
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="stat-grid">
+
+        ${stat(
+          "⌘",
+          "Branches",
+          branches,
+          "Network locations"
+        )}
+
+        ${stat(
+          "◫",
+          "Products",
+          products,
+          "Master catalog"
+        )}
+
+        ${stat(
+          "♧",
+          "Customers",
+          customers,
+          "Registered users"
+        )}
+
+        ${stat(
+          "▥",
+          "Inventory",
+          inventory,
+          "Branch stock rows"
+        )}
+
+      </div>
+
+
+      <div class="grid-2">
+
+        <div class="panel">
+
+          <div class="panel-head">
+            <div>
+              <h3>
+                Operations map
+              </h3>
+
+              <p>
+                Core backend areas
+                available in this
+                console
+              </p>
+            </div>
+          </div>
+
+
+          <div class="panel-body">
+
+            <div class="quick-grid">
+
+              ${quick(
+                "branches",
+                "⌘",
+                "Branch operations",
+                "Create, edit, assign manager"
+              )}
+
+              ${quick(
+                "categories",
+                "▦",
+                "Catalog structure",
+                "Categories and subcategories"
+              )}
+
+              ${quick(
+                "products",
+                "◫",
+                "Product master",
+                "Products, variants and images"
+              )}
+
+              ${quick(
+                "inventory",
+                "▥",
+                "Stock controls",
+                "Branch-level quantity & price"
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="panel">
+
+          <div class="panel-head">
+            <div>
+
+              <h3>
+                Role & security
+              </h3>
+
+              <p>
+                Backend remains
+                source of truth
+              </p>
+
+            </div>
+          </div>
+
+
+          <div class="panel-body">
+
+            <div class="activity-list">
+
+              <div class="activity-row">
+
+                <span
+                  class="activity-dot"
+                ></span>
+
+                <div>
+                  <b>
+                    Bearer token attached
+                  </b>
+
+                  <span>
+                    Protected calls use
+                    Authorization header
+                  </span>
+                </div>
+
+              </div>
+
+
+              <div class="activity-row">
+
+                <span
+                  class="activity-dot"
+                ></span>
+
+                <div>
+                  <b>
+                    Refresh flow enabled
+                  </b>
+
+                  <span>
+                    401 attempts token
+                    refresh once
+                  </span>
+                </div>
+
+              </div>
+
+
+              <div class="activity-row">
+
+                <span
+                  class="activity-dot"
+                ></span>
+
+                <div>
+                  <b>
+                    403 handled safely
+                  </b>
+
+                  <span>
+                    Unauthorized page
+                    instead of broken UI
+                  </span>
+                </div>
+
+              </div>
+
+
+              <div class="activity-row">
+
+                <span
+                  class="activity-dot"
+                ></span>
+
+                <div>
+                  <b>
+                    Current role:
+                    ${escapeHtml(
+                      getRole()
+                    )}
+                  </b>
+
+                  <span>
+                    JWT / admin profile
+                    derived
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    `;
+}
+
+
+function stat(
+  icon,
+  label,
+  value,
+  sub
+) {
+  return `
+    <div class="stat-card">
+
+      <div class="stat-top">
+
+        <span class="stat-icon">
+          ${icon}
+        </span>
+
+        <span class="trend">
+          LIVE
+        </span>
+
+      </div>
+
+      <h4>
+        ${escapeHtml(value)}
+      </h4>
+
+      <small>
+        ${escapeHtml(label)}
+      </small>
+
+      <span class="row-sub">
+        ${escapeHtml(sub)}
+      </span>
+
+    </div>
+  `;
+}
+
+
+function quick(
+  page,
+  icon,
+  title,
+  subtitle
+) {
+  return `
+    <button
+      class="quick-action"
+      onclick="navigate('${page}')"
+    >
+
+      <span class="stat-icon">
+        ${icon}
+      </span>
+
+      <b>
+        ${title}
+      </b>
+
+      <span>
+        ${subtitle}
+      </span>
+
+    </button>
+  `;
+}
+
+
+// ============================================================
+// GENERIC CRUD
+// ============================================================
+
+async function renderCrud(key) {
+  const module =
+    modules[key];
+
+  if (!module) {
+    return;
+  }
+
+
+  if (
+    key === "images"
+  ) {
+    return renderImages();
+  }
+
+
+  const rows =
+    await api(
+      module.list
+    );
+
+
+  state.data[key] =
+    rows;
+
+
+  // Keep relation cache fresh
+  state.relations[key] =
+    rows;
+
+
+  renderCrudTable(
+    key,
+    rows
+  );
+}
+
+
+function renderCrudTable(
+  key,
+  rows
+) {
+  const module =
+    modules[key];
+
+  const canCreate =
+    !!module.create;
+
+
+  const html = `
+    <div class="toolbar">
+
+      <div class="search">
+
+        <input
+          data-search="${key}"
+          placeholder="Search ${module.title.toLowerCase()}..."
+        >
+
+      </div>
+
+
+      <div class="toolbar-actions">
+
+        <button
+          class="secondary-btn"
+          onclick="navigate('${key}')"
+        >
+          ↻ Refresh
+        </button>
+
+        ${
+          canCreate
+            ? `
+              <button
+                class="primary-btn"
+                onclick="openCreate('${key}')"
+              >
+                ＋ Add ${module.title.replace(/s$/, "")}
+              </button>
+            `
+            : ""
+        }
+
+      </div>
+
+    </div>
+
+
+    <div class="panel">
+
+      <div class="panel-head">
+
+        <div>
+
+          <h3>
+            ${module.title}
+          </h3>
+
+          <p>
+            ${rows.length}
+            record${rows.length === 1 ? "" : "s"}
+            returned by the API
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="table-wrap"
+        id="table-${key}"
+      >
+        ${tableFor(key, rows)}
+      </div>
+
+    </div>
+  `;
+
+
+  $("#content")
+    .innerHTML =
+    html;
+
+
+  const search =
+    $(
+      `[data-search="${key}"]`
+    );
+
+
+  if (search) {
+    search.oninput =
+      () => {
+        const q =
+          search.value
+            .toLowerCase();
+
+
+        const filtered =
+          rows.filter(
+            (row) =>
+              JSON.stringify(row)
+                .toLowerCase()
+                .includes(q)
+          );
+
+
+        $(
+          `#table-${key}`
+        ).innerHTML =
+          tableFor(
+            key,
+            filtered
+          );
+      };
+  }
+}
+
+
+// ============================================================
+// GENERIC TABLE
+// ============================================================
+
+function tableFor(
+  key,
+  rows
+) {
+  const module =
+    modules[key];
+
+
+  if (!rows.length) {
+    return `
+      <div class="empty">
+
+        <div class="big">
+          ◇
+        </div>
+
+        <b>
+          No records found
+        </b>
+
+        <p>
+          Create the first record
+          or check the API response.
+        </p>
+
+      </div>
+    `;
+  }
+
+
+  return `
+    <table class="data-table">
+
+      <thead>
+        <tr>
+
+          ${
+            module.cols
+              .map(
+                (column) =>
+                  `
+                    <th>
+                      ${column.replaceAll("_", " ")}
+                    </th>
+                  `
+              )
+              .join("")
+          }
+
+          <th>
+            Actions
+          </th>
+
+        </tr>
+      </thead>
+
+
+      <tbody>
+
+        ${
+          rows
+            .map(
+              (row) => `
+                <tr>
+
+                  ${
+                    module.cols
+                      .map(
+                        (column) =>
+                          `
+                            <td>
+                              ${cell(
+                                column,
+                                row[column],
+                                row
+                              )}
+                            </td>
+                          `
+                      )
+                      .join("")
+                  }
+
+
+                  <td>
+
+                    <div class="actions">
+
+                      <button
+                        class="action-btn"
+                        onclick='openEdit(
+                          ${JSON.stringify(key)},
+                          ${JSON.stringify(row[module.id])}
+                        )'
+                      >
+                        Edit
+                      </button>
+
+
+                      ${
+                        key === "branches"
+                          ? `
+                            <button
+                              class="action-btn"
+                              onclick='openAssignManager(
+                                ${JSON.stringify(row[module.id])}
+                              )'
+                            >
+                              Assign Manager
+                            </button>
+                          `
+                          : ""
+                      }
+
+
+                      ${
+                        module.activatable
+                          ? `
+                            <button
+                              class="action-btn"
+                              onclick='toggleActive(
+                                ${JSON.stringify(key)},
+                                ${JSON.stringify(row[module.id])},
+                                ${!!row.is_active}
+                              )'
+                            >
+                              ${
+                                row.is_active
+                                  ? "Disable"
+                                  : "Activate"
+                              }
+                            </button>
+                          `
+                          : ""
+                      }
+
+
+                      <button
+                        class="action-btn danger"
+                        onclick='removeRow(
+                          ${JSON.stringify(key)},
+                          ${JSON.stringify(row[module.id])}
+                        )'
+                      >
+                        Delete
+                      </button>
+
+                    </div>
+
+                  </td>
+
+                </tr>
+              `
+            )
+            .join("")
+        }
+
+      </tbody>
+
+    </table>
+  `;
+}
+
+
+// ============================================================
+// TABLE CELL
+// ============================================================
+
+function cell(
+  key,
+  value,
+  row
+) {
+  if (
+    key === "is_active" ||
+    key === "is_available"
+  ) {
+    return `
+      <span
+        class="badge ${
+          value ? "on" : "off"
+        }"
+      >
+        ●
+        ${
+          value
+            ? "Active"
+            : "Inactive"
+        }
+      </span>
+    `;
+  }
+
+
+  if (
+    key === "role"
+  ) {
+    return `
+      <span class="badge role">
+        ${escapeHtml(value)}
+      </span>
+    `;
+  }
+
+
+  if (
+    key.includes("created_at") ||
+    key.includes("updated_at")
+  ) {
+    return value
+      ? new Date(
+          value
+        ).toLocaleDateString()
+      : "—";
+  }
+
+
+  if (
+    key === "image_url" &&
+    value
+  ) {
+    return `
+      <a
+        href="${escapeHtml(value)}"
+        target="_blank"
+      >
+        Image URL ↗
+      </a>
+    `;
+  }
+
+
+  if (
+    key === "name"
+  ) {
+    return `
+      <span class="row-title">
+        ${escapeHtml(value)}
+      </span>
+
+      ${
+        row.unique_id
+          ? `
+            <span class="row-sub">
+              ${escapeHtml(row.unique_id)}
+            </span>
+          `
+          : ""
+      }
+    `;
+  }
+
+
+  return escapeHtml(
+    value ?? "—"
+  );
+}
+
+
+// ============================================================
+// OPENAPI SCHEMA HELPERS
+// ============================================================
+
+function schema(name) {
+  return (
+    state.spec
+      ?.components
+      ?.schemas
+      ?.[name] ||
+    {
+      properties: {},
+    }
+  );
+}
+
+
+function fieldType(def) {
+  const field =
+    def.type
+      ? def
+      : (
+          def.anyOf?.find(
+            (x) =>
+              x.type &&
+              x.type !== "null"
+          ) || {}
+        );
+
+
+  if (
+    field.type === "boolean"
+  ) {
+    return "boolean";
+  }
+
+
+  if (
+    field.type === "integer" ||
+    field.type === "number"
+  ) {
+    return "number";
+  }
+
+
+  if (
+    field.format === "email"
+  ) {
+    return "email";
+  }
+
+
+  if (
+    field.format === "date-time"
+  ) {
+    return "datetime-local";
+  }
+
+
+  return "text";
+}
+
+
+// ============================================================
+// RELATION SELECT
+// ============================================================
+
+function relationFieldHtml(
+  key,
+  required,
+  selectedValue = ""
+) {
+  const config =
+    relationConfig[key];
+
+  if (!config) {
+    return "";
+  }
+
+
+  const rows =
+    state.relations[
+      config.cache
+    ] || [];
+
+
+  const label =
+    key
+      .replaceAll(
+        "_unique_id",
+        ""
+      )
+      .replaceAll(
+        "_",
+        " "
+      )
+      .replace(
+        /\b\w/g,
+        (m) =>
+          m.toUpperCase()
+      );
+
+
+  return `
+    <label class="field">
+
+      <span>
+        ${label}
+        ${required ? " *" : ""}
+      </span>
+
+
+      <select
+        name="${key}"
+        ${required ? "required" : ""}
+      >
+
+        <option value="">
+          ${
+            required
+              ? config.placeholder
+              : `No change / ${config.placeholder}`
+          }
+        </option>
+
+
+        ${
+          rows
+            .map(
+              (row) => `
+                <option
+                  value="${escapeHtml(row.unique_id)}"
+                  ${
+                    String(
+                      selectedValue || ""
+                    ) ===
+                    String(
+                      row.unique_id || ""
+                    )
+                      ? "selected"
+                      : ""
+                  }
+                >
+                  ${escapeHtml(
+                    config.label(row)
+                  )}
+                </option>
+              `
+            )
+            .join("")
+        }
+
+      </select>
+
+      ${
+        !rows.length
+          ? `
+            <small>
+              No records were returned
+              by ${escapeHtml(config.path)}.
+            </small>
+          `
+          : ""
+      }
+
+    </label>
+  `;
+}
+
+
+// ============================================================
+// FORM BUILDER
+//
+// NOW ASYNC because it fetches related records first.
+// ============================================================
+
+async function formFields(
+  schemaName,
+  data = {}
+) {
+  await prepareRelationsForSchema(
+    schemaName
+  );
+
+
+  const s =
+    schema(schemaName);
+
+
+  const required =
+    new Set(
+      s.required || []
+    );
+
+
+  return Object.entries(
+    s.properties || {}
+  )
+    .map(
+      ([key, definition]) => {
+
+        const isRequired =
+          required.has(key);
+
+
+        const value =
+          data[key];
+
+
+        // ---------------------------------
+        // RELATIONAL UUID FIELD
+        // ---------------------------------
+
+        if (
+          relationConfig[key]
+        ) {
+          return relationFieldHtml(
+            key,
+            isRequired,
+            value
+          );
+        }
+
+
+        const type =
+          fieldType(
+            definition
+          );
+
+
+        const label =
+          key
+            .replaceAll(
+              "_",
+              " "
+            )
+            .replace(
+              /\b\w/g,
+              (m) =>
+                m.toUpperCase()
+            );
+
+
+        // ---------------------------------
+        // BOOLEAN
+        // ---------------------------------
+
+        if (
+          type === "boolean"
+        ) {
+          return `
+            <label class="field">
+
+              <span>
+                ${label}
+                ${isRequired ? " *" : ""}
+              </span>
+
+
+              <select
+                name="${key}"
+              >
+
+                <option
+                  value="true"
+                  ${
+                    value === true
+                      ? "selected"
+                      : ""
+                  }
+                >
+                  Yes
+                </option>
+
+
+                <option
+                  value="false"
+                  ${
+                    value === false
+                      ? "selected"
+                      : ""
+                  }
+                >
+                  No
+                </option>
+
+
+                ${
+                  !isRequired
+                    ? `
+                      <option
+                        value=""
+                        ${
+                          value === undefined ||
+                          value === null
+                            ? "selected"
+                            : ""
+                        }
+                      >
+                        No change
+                      </option>
+                    `
+                    : ""
+                }
+
+              </select>
+
+            </label>
+          `;
+        }
+
+
+        // ---------------------------------
+        // NORMAL FIELD
+        // ---------------------------------
+
+        return `
+          <label
+            class="field ${
+              [
+                "description",
+                "address",
+                "image_url",
+              ].includes(key)
+                ? "full"
+                : ""
+            }"
+          >
+
+            <span>
+              ${label}
+              ${isRequired ? " *" : ""}
+            </span>
+
+
+            <input
+              name="${key}"
+              type="${type}"
+              value="${escapeHtml(
+                value ?? ""
+              )}"
+              ${
+                isRequired
+                  ? "required"
+                  : ""
+              }
+              placeholder="${label}"
+            >
+
+          </label>
+        `;
+      }
+    )
+    .join("");
+}
+
+
+// ============================================================
+// MODAL
+// ============================================================
+
+function openModal({
+  title,
+  kicker = "ACTION",
+  body,
+  submit =
+    "Save changes",
+  onSubmit,
+}) {
+  state.modal = {
+    onSubmit,
+  };
+
+
+  $("#modal-title")
+    .textContent =
+    title;
+
+
+  $("#modal-kicker")
+    .textContent =
+    kicker;
+
+
+  $("#modal-body")
+    .innerHTML =
+    body;
+
+
+  $("#modal-submit")
+    .textContent =
+    submit;
+
+
+  $("#modal")
+    .classList
+    .remove("hidden");
+}
+
+
+function closeModal() {
+  $("#modal")
+    .classList
+    .add("hidden");
+
+  state.modal = null;
+}
+
+
+// ============================================================
+// FORM -> JS OBJECT
+// ============================================================
+
+function formObject(form) {
+  const result = {};
+
+
+  new FormData(form)
+    .forEach(
+      (value, key) => {
+
+        if (
+          value === ""
+        ) {
+          return;
+        }
+
+
+        const input =
+          form.elements[key];
+
+
+        if (
+          input?.tagName ===
+            "SELECT" &&
+          (
+            value === "true" ||
+            value === "false"
+          )
+        ) {
+          result[key] =
+            value === "true";
+        }
+
+        else if (
+          input?.type ===
+          "number"
+        ) {
+          result[key] =
+            Number(value);
+        }
+
+        else {
+          result[key] =
+            value;
+        }
+      }
+    );
+
+
+  return result;
+}
+
+
+// ============================================================
+// CREATE
+// ============================================================
+
+async function openCreate(key) {
+  const module =
+    modules[key];
+
+
+  let body =
+    await formFields(
+      module.createSchema
+    );
+
+
+  // -----------------------------------------
+  // CREATE BRANCH:
+  // optional manager selection
+  // -----------------------------------------
+
+  if (
+    key === "branches"
+  ) {
+    await loadRelation(
+      "manager_unique_id",
+      true
+    );
+
+
+    body += `
+      <div
+        class="full"
+        style="
+          margin-top:8px;
+          padding-top:16px;
+          border-top:1px solid var(--line);
+        "
+      >
+
+        <div
+          style="
+            font-weight:700;
+            margin-bottom:10px;
+          "
+        >
+          Manager Assignment
+        </div>
+
+        <div class="muted"
+          style="
+            font-size:12px;
+            margin-bottom:12px;
+          "
+        >
+          Optional. The branch will be
+          created first and then the
+          selected manager will be
+          assigned automatically.
+        </div>
+
+      </div>
+
+      ${relationFieldHtml(
+        "manager_unique_id",
+        false
+      )}
+    `;
+  }
+
+
+  openModal({
+    title:
+      `Create ${module.title.replace(/s$/, "")}`,
+
+    kicker:
+      "NEW RECORD",
+
+    body,
+
+    submit:
+      "Create",
+
+    onSubmit:
+      async (data) => {
+
+        // -------------------------------------
+        // BRANCH + MANAGER
+        // -------------------------------------
+
+        if (
+          key === "branches"
+        ) {
+          const managerId =
+            data.manager_unique_id;
+
+
+          delete data.manager_unique_id;
+
+
+          // First create branch
+          const createdBranch =
+            await api(
+              module.create,
+              {
+                method:
+                  "POST",
+
+                body:
+                  JSON.stringify(
+                    data
+                  ),
+              }
+            );
+
+
+          // Then assign manager if selected
+          if (
+            managerId &&
+            createdBranch?.unique_id
+          ) {
+            await api(
+              `/branches/${encodeURIComponent(
+                createdBranch.unique_id
+              )}/manager`,
+              {
+                method:
+                  "PATCH",
+
+                body:
+                  JSON.stringify({
+                    manager_unique_id:
+                      managerId,
+                  }),
+              }
+            );
+
+
+            toast(
+              "Branch created",
+              "Manager assigned successfully"
+            );
+          } else {
+            toast(
+              "Branch created successfully"
+            );
+          }
+
+
+          // clear relation cache
+          delete state.relations.branches;
+          delete state.relations.managers;
+
+
+          closeModal();
+
+          navigate(
+            "branches"
+          );
+
+          return;
+        }
+
+
+        // -------------------------------------
+        // NORMAL CREATE
+        // -------------------------------------
+
+        await api(
+          module.create,
+          {
+            method:
+              "POST",
+
+            body:
+              JSON.stringify(
+                data
+              ),
+          }
+        );
+
+
+        // Relation cache may be stale now
+        if (
+          state.relations[key]
+        ) {
+          delete state.relations[key];
+        }
+
+
+        toast(
+          "Created successfully"
+        );
+
+
+        closeModal();
+
+        navigate(key);
+      },
+  });
+}
+
+
+// ============================================================
+// EDIT
+// ============================================================
+
+async function openEdit(
+  key,
+  id
+) {
+  const module =
+    modules[key];
+
+
+  const record =
+    (
+      state.data[key] ||
+      []
+    ).find(
+      (x) =>
+        x[module.id] === id
+    ) || {};
+
+
+  const body =
+    await formFields(
+      module.updateSchema,
+      record
+    );
+
+
+  openModal({
+    title:
+      `Edit ${module.title.replace(/s$/, "")}`,
+
+    kicker:
+      "UPDATE RECORD",
+
+    body,
+
+    onSubmit:
+      async (data) => {
+
+        const base =
+          module.base ||
+          (
+            key === "branches"
+              ? "/branches"
+              : "/" + key
+          );
+
+
+        await api(
+          `${base}/${encodeURIComponent(id)}`,
+          {
+            method:
+              "PATCH",
+
+            body:
+              JSON.stringify(
+                data
+              ),
+          }
+        );
+
+
+        toast(
+          "Changes saved"
+        );
+
+
+        closeModal();
+
+        navigate(key);
+      },
+  });
+}
+
+
+// ============================================================
+// ASSIGN / CHANGE BRANCH MANAGER
+// ============================================================
+
+async function openAssignManager(
+  branchUniqueId
+) {
+  const branches =
+    state.data.branches ||
+    [];
+
+
+  const branch =
+    branches.find(
+      (x) =>
+        x.unique_id ===
+        branchUniqueId
+    );
+
+
+  const managers =
+    await loadRelation(
+      "manager_unique_id",
+      true
+    );
+
+
+  // Find currently assigned manager
+  // manager response contains branch field
+  const currentManager =
+    managers.find(
+      (manager) =>
+        manager.branch?.unique_id ===
+        branchUniqueId
+    );
+
+
+  const managerSelect =
+    relationFieldHtml(
+      "manager_unique_id",
+      true,
+      currentManager?.unique_id ||
+        ""
+    );
+
+
+  openModal({
+    title:
+      `Assign Manager${
+        branch?.name
+          ? ` — ${branch.name}`
+          : ""
+      }`,
+
+    kicker:
+      "BRANCH MANAGER",
+
+    body: `
+      <div
+        class="full"
+        style="
+          background:#f6f8f6;
+          padding:14px;
+          border-radius:12px;
+          margin-bottom:8px;
+        "
+      >
+
+        <b>
+          ${
+            branch?.name
+              ? escapeHtml(branch.name)
+              : "Selected branch"
+          }
+        </b>
+
+        <div
+          class="row-sub"
+          style="margin-top:4px"
+        >
+          ${
+            branch
+              ? escapeHtml(
+                  [
+                    branch.city,
+                    branch.pincode,
+                  ]
+                    .filter(Boolean)
+                    .join(" • ")
+                )
+              : ""
+          }
+        </div>
+
+      </div>
+
+
+      ${
+        currentManager
+          ? `
+            <div
+              class="full"
+              style="
+                padding:12px;
+                border:1px solid var(--line);
+                border-radius:10px;
+                margin-bottom:8px;
+              "
+            >
+
+              <small>
+                CURRENT MANAGER
+              </small>
+
+              <div
+                style="
+                  font-weight:700;
+                  margin-top:4px;
+                "
+              >
+                ${escapeHtml(
+                  currentManager.name
+                )}
+              </div>
+
+              <div class="row-sub">
+                ${escapeHtml(
+                  currentManager.email
+                )}
+              </div>
+
+            </div>
+          `
+          : `
+            <div
+              class="full muted"
+              style="
+                font-size:12px;
+                margin-bottom:8px;
+              "
+            >
+              No manager assignment
+              could be detected for
+              this branch.
+            </div>
+          `
+      }
+
+
+      ${managerSelect}
+    `,
+
+    submit:
+      currentManager
+        ? "Change Manager"
+        : "Assign Manager",
+
+    onSubmit:
+      async (data) => {
+
+        await api(
+          `/branches/${encodeURIComponent(
+            branchUniqueId
+          )}/manager`,
+          {
+            method:
+              "PATCH",
+
+            body:
+              JSON.stringify({
+                manager_unique_id:
+                  data.manager_unique_id,
+              }),
+          }
+        );
+
+
+        delete state.relations.managers;
+
+
+        toast(
+          currentManager
+            ? "Manager changed"
+            : "Manager assigned",
+          branch?.name ||
+            ""
+        );
+
+
+        closeModal();
+
+        navigate(
+          "branches"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// ACTIVATE / DEACTIVATE
+// ============================================================
+
+async function toggleActive(
+  key,
+  id,
+  current
+) {
+  const module =
+    modules[key];
+
+
+  try {
+    await api(
+      `${module.base}/${encodeURIComponent(id)}/${current ? "deactivate" : "activate"}`,
+      {
+        method:
+          "PATCH",
+      }
+    );
+
+
+    delete state.relations[key];
+
+
+    toast(
+      current
+        ? "Deactivated"
+        : "Activated"
+    );
+
+
+    navigate(key);
+
+  } catch (e) {
+
+    if (
+      [401, 403]
+        .includes(e.status)
+    ) {
+      renderUnauthorized(e);
+    }
+
+    else {
+      toast(
+        "Action failed",
+        e.message,
+        "error"
+      );
+    }
+  }
+}
+
+
+// ============================================================
+// DELETE
+// ============================================================
+
+function removeRow(
+  key,
+  id
+) {
+  const module =
+    modules[key];
+
+
+  const base =
+    module.base ||
+    (
+      key === "branches"
+        ? "/branches"
+        : "/" + key
+    );
+
+
+  openModal({
+    title:
+      "Confirm deletion",
+
+    kicker:
+      "DESTRUCTIVE ACTION",
+
+    body: `
+      <div class="danger-box full">
+
+        This will call
+
+        <b>
+          DELETE
+          ${escapeHtml(
+            base + "/" + id
+          )}
+        </b>.
+
+        This action may be
+        permanent depending on
+        your backend.
+
+      </div>
+    `,
+
+    submit:
+      "Delete permanently",
+
+    onSubmit:
+      async () => {
+
+        await api(
+          `${base}/${encodeURIComponent(id)}`,
+          {
+            method:
+              "DELETE",
+          }
+        );
+
+
+        delete state.relations[key];
+
+
+        toast(
+          "Record deleted"
+        );
+
+
+        closeModal();
+
+        navigate(key);
+      },
+  });
+}
+
+
+// ============================================================
+// CATEGORIES
+// ============================================================
+
+async function renderCategories() {
+  const [
+    categories,
+    subcategories,
+  ] = await Promise.all([
+    api("/categories"),
+    api("/subcategories"),
+  ]);
+
+
+  state.data.categories =
+    categories;
+
+  state.data.subcategories =
+    subcategories;
+
+
+  state.relations.categories =
+    categories;
+
+  state.relations.subcategories =
+    subcategories;
+
+
+  $("#content")
+    .innerHTML = `
+      <div class="toolbar">
+
+        <div class="search">
+
+          <input
+            id="cat-search"
+            placeholder="Search category or subcategory..."
+          >
+
+        </div>
+
+
+        <div class="toolbar-actions">
+
+          <button
+            class="secondary-btn"
+            onclick="openSubcategory()"
+          >
+            ＋ Subcategory
+          </button>
+
+          <button
+            class="primary-btn"
+            onclick="openCategory()"
+          >
+            ＋ Category
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="catalog-layout">
+
+        <div class="panel tree-panel">
+
+          <div class="panel-head">
+
+            <div>
+
+              <h3>
+                Category tree
+              </h3>
+
+              <p>
+                ${categories.length}
+                categories ·
+                ${subcategories.length}
+                subcategories
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <div class="panel-body">
+
+            ${
+              categories
+                .map(
+                  (category) => `
+                    <div class="tree-item">
+
+                      <b>
+                        ${escapeHtml(
+                          category.name
+                        )}
+                      </b>
+
+                      <span>
+                        ${
+                          subcategories.filter(
+                            (sub) =>
+                              sub.category_unique_id ===
+                              category.unique_id
+                          ).length
+                        }
+                      </span>
+
+                    </div>
+
+
+                    <div class="tree-sub">
+
+                      ${
+                        subcategories
+                          .filter(
+                            (sub) =>
+                              sub.category_unique_id ===
+                              category.unique_id
+                          )
+                          .map(
+                            (sub) => `
+                              <div class="tree-item">
+                                ↳
+                                ${escapeHtml(
+                                  sub.name
+                                )}
+                              </div>
+                            `
+                          )
+                          .join("")
+                      }
+
+                    </div>
+                  `
+                )
+                .join("")
+            }
+
+          </div>
+
+        </div>
+
+
+        <div class="panel">
+
+          <div class="panel-head">
+
+            <div>
+
+              <h3>
+                Categories
+              </h3>
+
+              <p>
+                Manage master grouping
+                and nested subcategories
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <div
+            class="table-wrap"
+            id="cat-table"
+          >
+            ${categoryTable(
+              categories,
+              subcategories
+            )}
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+
+  $("#cat-search")
+    .oninput =
+    (e) => {
+
+      const q =
+        e.target.value
+          .toLowerCase();
+
+
+      const filtered =
+        categories.filter(
+          (category) =>
+            JSON.stringify(
+              category
+            )
+              .toLowerCase()
+              .includes(q) ||
+
+            subcategories.some(
+              (sub) =>
+                sub.category_unique_id ===
+                  category.unique_id &&
+                JSON.stringify(sub)
+                  .toLowerCase()
+                  .includes(q)
+            )
+        );
+
+
+      $("#cat-table")
+        .innerHTML =
+        categoryTable(
+          filtered,
+          subcategories
+        );
+    };
+}
+
+
+// ============================================================
+// CATEGORY TABLE
+// ============================================================
+
+function categoryTable(
+  categories,
+  subcategories
+) {
+  if (
+    !categories.length
+  ) {
+    return `
+      <div class="empty">
+        <b>
+          No category found
+        </b>
+      </div>
+    `;
+  }
+
+
+  return `
+    <table class="data-table">
+
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Subcategories</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+
+      <tbody>
+
+        ${
+          categories
+            .map(
+              (category) => `
+                <tr>
+
+                  <td>
+
+                    <span class="row-title">
+                      ${escapeHtml(
+                        category.name
+                      )}
+                    </span>
+
+                    <span class="row-sub">
+                      /${escapeHtml(
+                        category.slug
+                      )}
+                    </span>
+
+                  </td>
+
+
+                  <td>
+
+                    ${
+                      subcategories
+                        .filter(
+                          (sub) =>
+                            sub.category_unique_id ===
+                            category.unique_id
+                        )
+                        .map(
+                          (sub) => `
+                            <span
+                              class="badge role"
+                              style="margin-right:4px"
+                            >
+                              ${escapeHtml(
+                                sub.name
+                              )}
+                            </span>
+                          `
+                        )
+                        .join("") ||
+                      "—"
+                    }
+
+                  </td>
+
+
+                  <td>
+                    ${cell(
+                      "is_active",
+                      category.is_active,
+                      category
+                    )}
+                  </td>
+
+
+                  <td>
+
+                    <div class="actions">
+
+                      <button
+                        class="action-btn"
+                        onclick='openCategory(
+                          ${JSON.stringify(
+                            category.unique_id
+                          )}
+                        )'
+                      >
+                        Edit
+                      </button>
+
+
+                      <button
+                        class="action-btn"
+                        onclick='viewSubcategories(
+                          ${JSON.stringify(
+                            category.unique_id
+                          )}
+                        )'
+                      >
+                        View nested
+                      </button>
+
+
+                      <button
+                        class="action-btn danger"
+                        onclick='deleteCategory(
+                          ${JSON.stringify(
+                            category.unique_id
+                          )}
+                        )'
+                      >
+                        Delete
+                      </button>
+
+                    </div>
+
+                  </td>
+
+                </tr>
+              `
+            )
+            .join("")
+        }
+
+      </tbody>
+
+    </table>
+  `;
+}
+
+
+// ============================================================
+// CREATE / EDIT CATEGORY
+// ============================================================
+
+async function openCategory(
+  id = null
+) {
+  const category =
+    (
+      state.data.categories ||
+      []
+    ).find(
+      (x) =>
+        x.unique_id === id
+    ) || {};
+
+
+  const schemaName =
+    id
+      ? "CategoryUpdate"
+      : "CategoryCreate";
+
+
+  const body =
+    await formFields(
+      schemaName,
+      category
+    );
+
+
+  openModal({
+    title:
+      id
+        ? "Edit category"
+        : "Create category",
+
+    body,
+
+    submit:
+      id
+        ? "Save changes"
+        : "Create",
+
+    onSubmit:
+      async (data) => {
+
+        await api(
+          id
+            ? `/categories/${encodeURIComponent(id)}`
+            : "/categories",
+          {
+            method:
+              id
+                ? "PATCH"
+                : "POST",
+
+            body:
+              JSON.stringify(
+                data
+              ),
+          }
+        );
+
+
+        delete state.relations.categories;
+
+
+        toast(
+          id
+            ? "Category updated"
+            : "Category created"
+        );
+
+
+        closeModal();
+
+        navigate(
+          "categories"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// CREATE SUBCATEGORY
+// ============================================================
+
+async function openSubcategory(
+  id = null
+) {
+  const subcategory =
+    (
+      state.data.subcategories ||
+      []
+    ).find(
+      (x) =>
+        x.unique_id === id
+    ) || {};
+
+
+  const schemaName =
+    id
+      ? "SubCategoryUpdate"
+      : "SubCategoryCreate";
+
+
+  const body =
+    await formFields(
+      schemaName,
+      subcategory
+    );
+
+
+  openModal({
+    title:
+      id
+        ? "Edit subcategory"
+        : "Create subcategory",
+
+    body,
+
+    submit:
+      id
+        ? "Save changes"
+        : "Create",
+
+    onSubmit:
+      async (data) => {
+
+        await api(
+          id
+            ? `/subcategories/${encodeURIComponent(id)}`
+            : "/subcategories",
+          {
+            method:
+              id
+                ? "PATCH"
+                : "POST",
+
+            body:
+              JSON.stringify(
+                data
+              ),
+          }
+        );
+
+
+        delete state.relations.subcategories;
+
+
+        toast(
+          "Subcategory saved"
+        );
+
+
+        closeModal();
+
+        navigate(
+          "categories"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// VIEW SUBCATEGORIES
+// ============================================================
+
+async function viewSubcategories(id) {
+  try {
+    const result =
+      await api(
+        `/categories/${encodeURIComponent(id)}/subcategories`
+      );
+
+
+    openModal({
+      title:
+        "Category details",
+
+      kicker:
+        "NESTED SUBCATEGORIES",
+
+      body: `
+        <div class="full">
+
+          <pre
+            style="
+              white-space:pre-wrap;
+              font-size:11px;
+              background:#f6f8f6;
+              padding:14px;
+              border-radius:12px;
+            "
+          >${escapeHtml(
+            JSON.stringify(
+              result,
+              null,
+              2
+            )
+          )}</pre>
+
+        </div>
+      `,
+
+      submit:
+        "Close",
+
+      onSubmit:
+        async () =>
+          closeModal(),
+    });
+
+  } catch (e) {
+    toast(
+      "Could not load",
+      e.message,
+      "error"
+    );
+  }
+}
+
+
+// ============================================================
+// DELETE CATEGORY
+// ============================================================
+
+function deleteCategory(id) {
+  openModal({
+    title:
+      "Delete category",
+
+    kicker:
+      "DESTRUCTIVE ACTION",
+
+    body: `
+      <div class="danger-box full">
+
+        Delete category
+
+        <b>
+          ${escapeHtml(id)}
+        </b>?
+
+        The backend will decide
+        whether linked
+        subcategories/products
+        prevent deletion.
+
+      </div>
+    `,
+
+    submit:
+      "Delete",
+
+    onSubmit:
+      async () => {
+
+        await api(
+          `/categories/${encodeURIComponent(id)}`,
+          {
+            method:
+              "DELETE",
+          }
+        );
+
+
+        delete state.relations.categories;
+
+
+        closeModal();
+
+        navigate(
+          "categories"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// INVENTORY
+// ============================================================
+
+async function renderInventory() {
+  const rows =
+    await api(
+      "/inventory"
+    );
+
+
+  state.data.inventory =
+    rows;
+
+
+  $("#content")
+    .innerHTML = `
+      <div class="toolbar">
+
+        <div class="search">
+
+          <input
+            id="inv-search"
+            placeholder="Search inventory response..."
+          >
+
+        </div>
+
+
+        <div class="toolbar-actions">
+
+          <button
+            class="secondary-btn"
+            onclick="openStockAction()"
+          >
+            ± Adjust stock
+          </button>
+
+          <button
+            class="primary-btn"
+            onclick="openInventoryCreate()"
+          >
+            ＋ Add inventory
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="panel">
+
+        <div class="panel-head">
+
+          <div>
+
+            <h3>
+              Branch inventory
+            </h3>
+
+            <p>
+              ${rows.length}
+              inventory rows
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div
+          class="table-wrap"
+          id="inv-table"
+        >
+          ${inventoryTable(rows)}
+        </div>
+
+      </div>
+    `;
+
+
+  $("#inv-search")
+    .oninput =
+    (e) => {
+      const q =
+        e.target.value
+          .toLowerCase();
+
+
+      $("#inv-table")
+        .innerHTML =
+        inventoryTable(
+          rows.filter(
+            (row) =>
+              JSON.stringify(row)
+                .toLowerCase()
+                .includes(q)
+          )
+        );
+    };
+}
+
+
+// ============================================================
+// INVENTORY TABLE
+// ============================================================
+
+function inventoryTable(
+  rows
+) {
+  if (!rows.length) {
+    return `
+      <div class="empty">
+
+        <div class="big">
+          ▥
+        </div>
+
+        <b>
+          No inventory rows
+        </b>
+
+        <p>
+          Add a branch/product
+          variant mapping to start
+          managing stock.
+        </p>
+
+      </div>
+    `;
+  }
+
+
+  const keys = [
+    "stock_quantity",
+    "selling_price_override",
+    "is_available",
+    "created_at",
+    "updated_at",
+  ];
+
+
+  return `
+    <table class="data-table">
+
+      <thead>
+        <tr>
+
+          ${
+            keys
+              .map(
+                (key) =>
+                  `
+                    <th>
+                      ${key.replaceAll("_", " ")}
+                    </th>
+                  `
+              )
+              .join("")
+          }
+
+          <th>
+            Raw
+          </th>
+
+        </tr>
+      </thead>
+
+
+      <tbody>
+
+        ${
+          rows
+            .map(
+              (row) => `
+                <tr>
+
+                  ${
+                    keys
+                      .map(
+                        (key) =>
+                          `
+                            <td>
+                              ${cell(
+                                key,
+                                row[key],
+                                row
+                              )}
+                            </td>
+                          `
+                      )
+                      .join("")
+                  }
+
+                  <td>
+
+                    <button
+                      class="action-btn"
+                      onclick='showRaw(
+                        ${JSON.stringify(row)}
+                      )'
+                    >
+                      View
+                    </button>
+
+                  </td>
+
+                </tr>
+              `
+            )
+            .join("")
+        }
+
+      </tbody>
+
+    </table>
+  `;
+}
+
+
+// ============================================================
+// CREATE INVENTORY
+//
+// branch_unique_id + product_variant_unique_id
+// automatically become dropdowns
+// ============================================================
+
+async function openInventoryCreate() {
+  // Always refresh because inventory relies
+  // on latest branches/variants.
+  await Promise.all([
+    loadRelation(
+      "branch_unique_id",
+      true
+    ),
+
+    loadRelation(
+      "product_variant_unique_id",
+      true
+    ),
+  ]);
+
+
+  const body =
+    await formFields(
+      "BranchInventoryCreate"
+    );
+
+
+  openModal({
+    title:
+      "Add branch inventory",
+
+    body,
+
+    submit:
+      "Create inventory",
+
+    onSubmit:
+      async (data) => {
+
+        await api(
+          "/inventory",
+          {
+            method:
+              "POST",
+
+            body:
+              JSON.stringify(
+                data
+              ),
+          }
+        );
+
+
+        toast(
+          "Inventory created"
+        );
+
+
+        closeModal();
+
+        navigate(
+          "inventory"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// STOCK ACTION
+//
+// Raw UUID fields replaced with dropdowns
+// ============================================================
+
+async function openStockAction() {
+  const [
+    branches,
+    variants,
+  ] = await Promise.all([
+    loadRelation(
+      "branch_unique_id",
+      true
+    ),
+
+    loadRelation(
+      "product_variant_unique_id",
+      true
+    ),
+  ]);
+
+
+  const branchOptions =
+    branches
+      .map(
+        (branch) => `
+          <option
+            value="${escapeHtml(branch.unique_id)}"
+          >
+            ${escapeHtml(
+              relationConfig
+                .branch_unique_id
+                .label(branch)
+            )}
+          </option>
+        `
+      )
+      .join("");
+
+
+  const variantOptions =
+    variants
+      .map(
+        (variant) => `
+          <option
+            value="${escapeHtml(variant.unique_id)}"
+          >
+            ${escapeHtml(
+              relationConfig
+                .product_variant_unique_id
+                .label(variant)
+            )}
+          </option>
+        `
+      )
+      .join("");
+
+
+  openModal({
+    title:
+      "Adjust stock",
+
+    kicker:
+      "INCREASE / DECREASE",
+
+    body: `
+      <label class="field">
+
+        <span>
+          Branch *
+        </span>
+
+        <select
+          name="branch_unique_id"
+          required
+        >
+
+          <option value="">
+            Choose branch
+          </option>
+
+          ${branchOptions}
+
+        </select>
+
+      </label>
+
+
+      <label class="field">
+
+        <span>
+          Product Variant *
+        </span>
+
+        <select
+          name="product_variant_unique_id"
+          required
+        >
+
+          <option value="">
+            Choose product variant
+          </option>
+
+          ${variantOptions}
+
+        </select>
+
+      </label>
+
+
+      <label class="field">
+
+        <span>
+          Quantity *
+        </span>
+
+        <input
+          name="quantity"
+          type="number"
+          min="1"
+          required
+        >
+
+      </label>
+
+
+      <label class="field">
+
+        <span>
+          Action
+        </span>
+
+        <select name="action">
+
+          <option value="increase-stock">
+            Increase stock
+          </option>
+
+          <option value="decrease-stock">
+            Decrease stock
+          </option>
+
+        </select>
+
+      </label>
+    `,
+
+    submit:
+      "Apply stock change",
+
+    onSubmit:
+      async (data) => {
+
+        const path =
+          `/inventory/branch/${encodeURIComponent(
+            data.branch_unique_id
+          )}/variant/${encodeURIComponent(
+            data.product_variant_unique_id
+          )}/${data.action}`;
+
+
+        await api(
+          path,
+          {
+            method:
+              "PATCH",
+
+            body:
+              JSON.stringify({
+                quantity:
+                  Number(
+                    data.quantity
+                  ),
+              }),
+          }
+        );
+
+
+        toast(
+          "Stock updated"
+        );
+
+
+        closeModal();
+
+        navigate(
+          "inventory"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// BRANCH CATALOG
+// ============================================================
+
+async function renderCatalog() {
+  const branches =
+    await api(
+      "/branches/"
+    );
+
+
+  state.data.branches =
+    branches;
+
+  state.relations.branches =
+    branches;
+
+
+  $("#content")
+    .innerHTML = `
+      <div class="toolbar">
+
+        <div>
+
+          <b
+            style="
+              font:800 16px Manrope
+            "
+          >
+            Branch catalog preview
+          </b>
+
+          <span class="row-sub">
+            Select a branch to call
+            /branch-catalog/{branch_unique_id}
+          </span>
+
+        </div>
+
+
+        <div class="toolbar-actions">
+
+          <select
+            id="catalog-branch"
+            style="
+              padding:11px;
+              border:1px solid var(--line);
+              border-radius:10px;
+            "
+          >
+
+            <option value="">
+              Choose branch…
+            </option>
+
+            ${
+              branches
+                .map(
+                  (branch) => `
+                    <option
+                      value="${escapeHtml(branch.unique_id)}"
+                    >
+                      ${escapeHtml(branch.name)}
+                      —
+                      ${escapeHtml(branch.city)}
+                    </option>
+                  `
+                )
+                .join("")
+            }
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+      <div
+        id="catalog-content"
+        class="panel"
+      >
+
+        <div class="empty">
+
+          <div class="big">
+            ⊞
+          </div>
+
+          <b>
+            Select a branch
+          </b>
+
+          <p>
+            Products, brand,
+            subcategory, images and
+            variants returned by the
+            branch catalog API will
+            appear here.
+          </p>
+
+        </div>
+
+      </div>
+    `;
+
+
+  $("#catalog-branch")
+    .onchange =
+    async (e) => {
+
+      if (
+        !e.target.value
+      ) {
+        return;
+      }
+
+
+      const box =
+        $("#catalog-content");
+
+
+      box.innerHTML = `
+        <div class="panel-body">
+
+          <div class="skeleton">
+          </div>
+
+          <br>
+
+          <div class="skeleton">
+          </div>
+
+        </div>
+      `;
+
+
+      try {
+        const rows =
+          await api(
+            `/branch-catalog/${encodeURIComponent(
+              e.target.value
+            )}`
+          );
+
+
+        box.innerHTML = `
+          <div class="panel-head">
+
+            <div>
+
+              <h3>
+                Available catalog
+              </h3>
+
+              <p>
+                ${rows.length}
+                products returned
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <div class="panel-body">
+
+            <div class="product-grid">
+
+              ${
+                rows
+                  .map(
+                    (product) => `
+                      <div class="product-card">
+
+                        <div class="product-img">
+
+                          ${
+                            product.images?.[0]?.image_url
+                              ? `
+                                <img
+                                  src="${escapeHtml(
+                                    product.images[0].image_url
+                                  )}"
+                                  alt=""
+                                >
+                              `
+                              : "◫"
+                          }
+
+                        </div>
+
+
+                        <div class="product-info">
+
+                          <h4>
+                            ${escapeHtml(
+                              product.name
+                            )}
+                          </h4>
+
+                          <p>
+                            ${escapeHtml(
+                              product.brand?.name ||
+                              "No brand"
+                            )}
+                            ·
+                            ${escapeHtml(
+                              product.subcategory?.name ||
+                              "No subcategory"
+                            )}
+                          </p>
+
+
+                          <div class="product-foot">
+
+                            <span class="badge on">
+                              ${
+                                product.variants?.length ||
+                                0
+                              }
+                              variants
+                            </span>
+
+
+                            <button
+                              class="action-btn"
+                              onclick='showRaw(
+                                ${JSON.stringify(product)}
+                              )'
+                            >
+                              Details
+                            </button>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+                    `
+                  )
+                  .join("")
+              }
+
+            </div>
+
+          </div>
+        `;
+
+      } catch (err) {
+        box.innerHTML = "";
+
+        handlePageError(
+          err
+        );
+      }
+    };
+}
+
+
+// ============================================================
+// PRODUCT IMAGES
+//
+// Product UUID input replaced by Product dropdown
+// ============================================================
+
+async function renderImages() {
+  const products =
+    await loadRelation(
+      "product_unique_id",
+      true
+    );
+
+
+  const productOptions =
+    products
+      .map(
+        (product) => `
+          <option
+            value="${escapeHtml(product.unique_id)}"
+          >
+            ${escapeHtml(
+              relationConfig
+                .product_unique_id
+                .label(product)
+            )}
+          </option>
+        `
+      )
+      .join("");
+
+
+  const body = `
+    <div class="toolbar">
+
+      <div>
+
+        <b
+          style="
+            font:800 16px Manrope
+          "
+        >
+          Product images
+        </b>
+
+        <span class="row-sub">
+          Choose product instead
+          of entering UUID manually.
+        </span>
+
+      </div>
+
+
+      <div class="toolbar-actions">
+
+        <button
+          class="primary-btn"
+          onclick="openCreate('images')"
+        >
+          ＋ Add image
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <div class="panel">
+
+      <div class="panel-body">
+
+        <div
+          style="
+            display:flex;
+            gap:8px;
+            align-items:center;
+          "
+        >
+
+          <select
+            id="img-product-id"
+            style="
+              flex:1;
+              padding:11px;
+              border:1px solid var(--line);
+              border-radius:10px;
+            "
+          >
+
+            <option value="">
+              Choose product
+            </option>
+
+            ${productOptions}
+
+          </select>
+
+
+          <button
+            id="load-images"
+            class="secondary-btn"
+          >
+            Load images
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div
+        id="images-result"
+      ></div>
+
+    </div>
+  `;
+
+
+  $("#content")
+    .innerHTML =
+    body;
+
+
+  $("#load-images")
+    .onclick =
+    async () => {
+
+      const id =
+        $("#img-product-id")
+          .value
+          .trim();
+
+
+      if (!id) {
+        toast(
+          "Choose product",
+          "Select a product first",
+          "error"
+        );
+
+        return;
+      }
+
+
+      try {
+        const rows =
+          await api(
+            `/product-images/product/${encodeURIComponent(id)}`
+          );
+
+
+        state.data.images =
+          rows;
+
+
+        $("#images-result")
+          .innerHTML = `
+            <div class="table-wrap">
+              ${tableFor(
+                "images",
+                rows
+              )}
+            </div>
+          `;
+
+      } catch (e) {
+        handlePageError(e);
+      }
+    };
+}
+
+
+// ============================================================
+// ADMIN PROFILE
+// ============================================================
+
+async function renderProfile() {
+  try {
+    const profile =
+      await api(
+        "/admin/get"
+      );
+
+
+    state.user =
+      profile;
+
+
+    saveSession();
+
+    setUserUI();
+
+
+    $("#content")
+      .innerHTML = `
+        <div class="grid-2">
+
+          <div class="panel">
+
+            <div class="panel-head">
+
+              <div>
+
+                <h3>
+                  Super Admin profile
+                </h3>
+
+                <p>
+                  GET /admin/get
+                </p>
+
+              </div>
+
+
+              <button
+                class="primary-btn"
+                onclick='editAdmin(
+                  ${JSON.stringify(profile)}
+                )'
+              >
+                Edit profile
+              </button>
+
+            </div>
+
+
+            <div class="panel-body">
+
+              <div class="activity-list">
+
+                ${
+                  Object.entries(profile)
+                    .map(
+                      ([key, value]) => `
+                        <div class="activity-row">
+
+                          <span
+                            class="activity-dot"
+                          ></span>
+
+                          <div>
+
+                            <b>
+                              ${escapeHtml(
+                                key.replaceAll("_", " ")
+                              )}
+                            </b>
+
+                            <span>
+                              ${escapeHtml(value)}
+                            </span>
+
+                          </div>
+
+                        </div>
+                      `
+                    )
+                    .join("")
+                }
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="panel">
+
+            <div class="panel-head">
+
+              <div>
+
+                <h3>
+                  Danger zone
+                </h3>
+
+                <p>
+                  Protected admin actions
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div class="panel-body">
+
+              <div class="danger-box">
+                Deleting the Super Admin
+                can lock you out of
+                protected administrative
+                APIs.
+              </div>
+
+              <br>
+
+
+              <button
+                class="secondary-btn"
+                style="color:#b3453f"
+                onclick="deleteAdmin()"
+              >
+                Delete Super Admin
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      `;
+
+  } catch (e) {
+    handlePageError(e);
+  }
+}
+
+
+// ============================================================
+// EDIT ADMIN
+// ============================================================
+
+async function editAdmin(profile) {
+  const body =
+    await formFields(
+      "UserUpdate",
+      {
+        name:
+          profile.name,
+
+        updated_at:
+          new Date()
+            .toISOString()
+            .slice(0, 16),
+      }
+    );
+
+
+  openModal({
+    title:
+      "Edit Super Admin",
+
+    body,
+
+    onSubmit:
+      async (data) => {
+
+        if (
+          data.updated_at
+        ) {
+          data.updated_at =
+            new Date(
+              data.updated_at
+            ).toISOString();
+        }
+
+
+        await api(
+          "/admin/update",
+          {
+            method:
+              "PATCH",
+
+            body:
+              JSON.stringify(
+                data
+              ),
+          }
+        );
+
+
+        toast(
+          "Admin updated"
+        );
+
+
+        closeModal();
+
+        navigate(
+          "profile"
+        );
+      },
+  });
+}
+
+
+// ============================================================
+// DELETE ADMIN
+// ============================================================
+
+function deleteAdmin() {
+  openModal({
+    title:
+      "Delete Super Admin",
+
+    kicker:
+      "DANGER ZONE",
+
+    body: `
+      <div class="danger-box full">
+
+        This calls
+        DELETE /admin/delete.
+
+        Make sure you understand
+        your backend lifecycle
+        before continuing.
+
+      </div>
+    `,
+
+    submit:
+      "Delete Admin",
+
+    onSubmit:
+      async () => {
+
+        await api(
+          "/admin/delete",
+          {
+            method:
+              "DELETE",
+          }
+        );
+
+
+        logout();
+      },
+  });
+}
+
+
+// ============================================================
+// API CONSOLE
+// ============================================================
+
+async function renderConsole() {
+  const spec =
+    await loadSpec();
+
+
+  const groups = {};
+
+
+  for (
+    const [path, operations]
+    of Object.entries(
+      spec.paths
+    )
+  ) {
+    for (
+      const [method, operation]
+      of Object.entries(
+        operations
+      )
+    ) {
+      if (
+        ![
+          "get",
+          "post",
+          "patch",
+          "delete",
+          "put",
+        ].includes(method)
+      ) {
+        continue;
+      }
+
+
+      const tag =
+        (
+          operation.tags ||
+          ["Other"]
+        )[0];
+
+
+      (
+        groups[tag] ??= []
+      ).push({
+        path,
+        method,
+        op:
+          operation,
+      });
+    }
+  }
+
+
+  $("#content")
+    .innerHTML = `
+      <div class="toolbar">
+
+        <div class="search">
+
+          <input
+            id="api-search"
+            placeholder="Search all ${
+              Object.values(groups)
+                .flat()
+                .length
+            } API operations..."
+          >
+
+        </div>
+
+
+        <div class="toolbar-actions">
+
+          <span class="badge role">
+            OpenAPI
+            ${escapeHtml(
+              spec.openapi
+            )}
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <div id="api-groups">
+        ${consoleGroups(groups)}
+      </div>
+    `;
+
+
+  $("#api-search")
+    .oninput =
+    (e) => {
+
+      const q =
+        e.target.value
+          .toLowerCase();
+
+
+      const filteredGroups =
+        {};
+
+
+      for (
+        const [tag, rows]
+        of Object.entries(
+          groups
+        )
+      ) {
+        const filtered =
+          rows.filter(
+            (x) =>
+              (
+                x.path +
+                " " +
+                x.method +
+                " " +
+                (x.op.summary || "") +
+                " " +
+                tag
+              )
+                .toLowerCase()
+                .includes(q)
+          );
+
+
+        if (
+          filtered.length
+        ) {
+          filteredGroups[tag] =
+            filtered;
+        }
+      }
+
+
+      $("#api-groups")
+        .innerHTML =
+        consoleGroups(
+          filteredGroups
+        );
+    };
+}
+
+
+// ============================================================
+// API GROUPS
+// ============================================================
+
+function consoleGroups(
+  groups
+) {
+  return (
+    Object.entries(groups)
+      .map(
+        ([tag, rows]) => `
+          <div class="panel api-group">
+
+            <div class="panel-head">
+
+              <div>
+
+                <h3>
+                  ${escapeHtml(tag)}
+                </h3>
+
+                <p>
+                  ${rows.length}
+                  operations
+                </p>
+
+              </div>
+
+            </div>
+
+
+            ${
+              rows
+                .map(
+                  (x) => `
+                    <div class="api-row">
+
+                      <span
+                        class="method ${x.method}"
+                      >
+                        ${x.method.toUpperCase()}
+                      </span>
+
+
+                      <div>
+
+                        <span class="api-path">
+                          ${escapeHtml(
+                            x.path
+                          )}
+                        </span>
+
+                        <span class="api-summary">
+                          ${escapeHtml(
+                            x.op.summary ||
+                            ""
+                          )}
+                        </span>
+
+                      </div>
+
+
+                      <button
+                        class="action-btn"
+                        onclick='invokeApi(
+                          ${JSON.stringify(x.path)},
+                          ${JSON.stringify(x.method)},
+                          ${JSON.stringify(
+                            x.op.requestBody
+                              ?.content
+                              ?.["application/json"]
+                              ?.schema
+                              ?.$ref
+                              ?.split("/")
+                              .pop() ||
+                            ""
+                          )}
+                        )'
+                      >
+                        Run
+                      </button>
+
+                    </div>
+                  `
+                )
+                .join("")
+            }
+
+          </div>
+        `
+      )
+      .join("") ||
+
+    `
+      <div class="empty">
+        <b>
+          No API operation matched
+        </b>
+      </div>
+    `
+  );
+}
+
+
+// ============================================================
+// API CONSOLE PARAM FIELD
+//
+// Also replaces path UUID values with dropdowns when possible.
+// ============================================================
+
+async function pathParamHtml(
+  parameterName
+) {
+  // path_ prefix will be added to form field
+  // but relationConfig uses original field name.
+
+  if (
+    relationConfig[
+      parameterName
+    ]
+  ) {
+    await loadRelation(
+      parameterName
+    );
+
+
+    const config =
+      relationConfig[
+        parameterName
+      ];
+
+
+    const rows =
+      state.relations[
+        config.cache
+      ] || [];
+
+
+    return `
+      <label class="field">
+
+        <span>
+          ${parameterName.replaceAll("_", " ")}
+          *
+        </span>
+
+
+        <select
+          name="path_${parameterName}"
+          required
+        >
+
+          <option value="">
+            ${config.placeholder}
+          </option>
+
+
+          ${
+            rows
+              .map(
+                (row) => `
+                  <option
+                    value="${escapeHtml(row.unique_id)}"
+                  >
+                    ${escapeHtml(
+                      config.label(row)
+                    )}
+                  </option>
+                `
+              )
+              .join("")
+          }
+
+        </select>
+
+      </label>
+    `;
+  }
+
+
+  return `
+    <label class="field">
+
+      <span>
+        ${parameterName.replaceAll("_", " ")}
+        *
+      </span>
+
+      <input
+        name="path_${parameterName}"
+        required
+      >
+
+    </label>
+  `;
+}
+
+
+// ============================================================
+// RUN API
+// ============================================================
+
+async function invokeApi(
+  path,
+  method,
+  schemaName
+) {
+  const params =
+    [
+      ...path.matchAll(
+        /\{([^}]+)\}/g
+      ),
+    ].map(
+      (match) =>
+        match[1]
+    );
+
+
+  const paramParts =
+    await Promise.all(
+      params.map(
+        (param) =>
+          pathParamHtml(
+            param
+          )
+      )
+    );
+
+
+  const paramFields =
+    paramParts.join("");
+
+
+  const requestBody =
+    schemaName
+      ? await formFields(
+          schemaName
+        )
+      : "";
+
+
+  openModal({
+    title:
+      `${method.toUpperCase()} ${path}`,
+
+    kicker:
+      "API CONSOLE",
+
+    body:
+      paramFields +
+      requestBody +
+      (
+        requestBody
+          ? ""
+          : `
+            <div
+              class="full muted"
+              style="
+                font-size:11px;
+              "
+            >
+              This operation has no
+              JSON request body in
+              the OpenAPI schema.
+            </div>
+          `
+      ),
+
+    submit:
+      "Run request",
+
+    onSubmit:
+      async (data) => {
+
+        let resolvedPath =
+          path;
+
+
+        for (
+          const name
+          of params
+        ) {
+          resolvedPath =
+            resolvedPath.replace(
+              `{${name}}`,
+              encodeURIComponent(
+                data[
+                  `path_${name}`
+                ]
+              )
+            );
+
+
+          delete data[
+            `path_${name}`
+          ];
+        }
+
+
+        const options = {
+          method:
+            method.toUpperCase(),
+        };
+
+
+        if (
+          ![
+            "GET",
+            "DELETE",
+          ].includes(
+            options.method
+          ) &&
+          Object.keys(data)
+            .length
+        ) {
+          options.body =
+            JSON.stringify(
+              data
+            );
+        }
+
+
+        try {
+          const result =
+            await api(
+              resolvedPath,
+              options
+            );
+
+
+          $("#modal-body")
+            .innerHTML = `
+              <div class="full">
+
+                <pre
+                  style="
+                    white-space:pre-wrap;
+                    max-height:55vh;
+                    overflow:auto;
+                    font-size:11px;
+                    background:#f6f8f6;
+                    padding:14px;
+                    border-radius:12px;
+                  "
+                >${escapeHtml(
+                  JSON.stringify(
+                    result,
+                    null,
+                    2
+                  )
+                )}</pre>
+
+              </div>
+            `;
+
+
+          $("#modal-submit")
+            .textContent =
+            "Close";
+
+
+          state.modal.onSubmit =
+            async () =>
+              closeModal();
+
+        } catch (e) {
+          if (
+            [401, 403]
+              .includes(e.status)
+          ) {
+            closeModal();
+
+            renderUnauthorized(
+              e
+            );
+          }
+
+          else {
+            toast(
+              "API request failed",
+              e.message,
+              "error"
+            );
+          }
+        }
+      },
+  });
+}
+
+
+// ============================================================
+// RAW RESPONSE
+// ============================================================
+
+function showRaw(data) {
+  openModal({
+    title:
+      "Record details",
+
+    kicker:
+      "RAW API RESPONSE",
+
+    body: `
+      <div class="full">
+
+        <pre
+          style="
+            white-space:pre-wrap;
+            max-height:60vh;
+            overflow:auto;
+            font-size:11px;
+            background:#f6f8f6;
+            padding:14px;
+            border-radius:12px;
+          "
+        >${escapeHtml(
+          JSON.stringify(
+            data,
+            null,
+            2
+          )
+        )}</pre>
+
+      </div>
+    `,
+
+    submit:
+      "Close",
+
+    onSubmit:
+      async () =>
+        closeModal(),
+  });
+}
+
+
+// ============================================================
+// LOGOUT
+// ============================================================
+
+function logout() {
+  sessionStorage.removeItem(
+    "blink_access"
+  );
+
+  sessionStorage.removeItem(
+    "blink_refresh"
+  );
+
+  sessionStorage.removeItem(
+    "blink_user"
+  );
+
+
+  state.access =
+    "";
+
+  state.refresh =
+    "";
+
+  state.user =
+    null;
+
+  state.relations =
+    {};
+
+
+  $("#app-view")
+    .classList
+    .add("hidden");
+
+
+  $("#login-view")
+    .classList
+    .remove("hidden");
+}
+
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+
+$("#login-form")
+  .addEventListener(
+    "submit",
+    login
+  );
+
+
+$("#base-url")
+  .value =
+  state.base;
+
+
+$("#toggle-password")
+  .onclick =
+  () => {
+    $("#login-password")
+      .type =
+      $("#login-password")
+        .type === "password"
+        ? "text"
+        : "password";
+  };
+
+
+$("#logout-btn")
+  .onclick =
+  logout;
+
+
+$("#refresh-page")
+  .onclick =
+  () =>
+    navigate(
+      state.page
+    );
+
+
+$("#menu-btn")
+  .onclick =
+  () =>
+    $("#sidebar")
+      .classList
+      .toggle("open");
+
+
+$$("[data-close-modal]")
+  .forEach(
+    (element) => {
+      element.onclick =
+        closeModal;
+    }
+  );
+
+
+// ============================================================
+// MODAL FORM SUBMIT
+// ============================================================
+
+$("#modal-form")
+  .onsubmit =
+  async (event) => {
+    event.preventDefault();
+
+
+    if (
+      !state.modal?.onSubmit
+    ) {
+      return;
+    }
+
+
+    const button =
+      $("#modal-submit");
+
+
+    const oldText =
+      button.textContent;
+
+
+    button.disabled =
+      true;
+
+
+    button.textContent =
+      "Working…";
+
+
+    try {
+      await state.modal.onSubmit(
+        formObject(
+          event.target
+        )
+      );
+    } catch (err) {
+
+      if (
+        [401, 403]
+          .includes(
+            err.status
+          )
+      ) {
+        closeModal();
+
+        renderUnauthorized(
+          err
+        );
+      }
+
+      else {
+        toast(
+          "Request failed",
+          err.message,
+          "error"
+        );
+      }
+
+    } finally {
+
+      button.disabled =
+        false;
+
+
+      if (
+        !$("#modal")
+          .classList
+          .contains("hidden")
+      ) {
+        button.textContent =
+          oldText;
+      }
+    }
+  };
+
+
+// ============================================================
+// AUTO LOGIN IF TOKEN EXISTS
+// ============================================================
+
+if (
+  state.access
+) {
+  showApp();
+}
