@@ -19,6 +19,7 @@ from app.models.product_model import Product
 from app.models.product_variant_model import ProductVariant
 from app.models.product_image_model import ProductImage
 from app.models.branch_inventory_model import BranchInventory
+from app.models.customer_model import CustomerAddress , Customer
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

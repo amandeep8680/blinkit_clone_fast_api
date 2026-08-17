@@ -149,3 +149,31 @@ INVENTORY_ALREADY_INACTIVE = "Inventory item is already unavailable."
 INVENTORY_DELETED = "Inventory item deleted successfully."
 INVALID_STOCK_QUANTITY = "Stock quantity cannot be negative."
 INSUFFICIENT_STOCK = "Insufficient stock available."
+
+
+
+# =========================
+# Customer Messages
+# =========================
+
+CUSTOMER_ALREADY_EXISTS = "Customer already exists."
+CUSTOMER_EMAIL_ALREADY_EXISTS = "Customer with this email already exists."
+CUSTOMER_PHONE_ALREADY_EXISTS = "Customer with this phone number already exists."
+CUSTOMER_NOT_FOUND = "Customer not found."
+CUSTOMER_ALREADY_ACTIVE = "Customer account is already active."
+CUSTOMER_ALREADY_INACTIVE = "Customer account is already inactive."
+CUSTOMER_DELETED = "Customer deleted successfully."
+
+
+# =========================
+# Customer Address Messages
+# =========================
+
+CUSTOMER_ADDRESS_NOT_FOUND = "Customer address not found."
+CUSTOMER_ADDRESS_LABEL_ALREADY_EXISTS = "Address with this label already exists."
+CUSTOMER_ADDRESS_DELETED = "Customer address deleted successfully."
+CUSTOMER_ADDRESS_ALREADY_ACTIVE = "Customer address is already active."
+CUSTOMER_ADDRESS_ALREADY_INACTIVE = "Customer address is already inactive."
+
+
+

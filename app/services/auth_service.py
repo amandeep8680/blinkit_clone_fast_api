@@ -18,7 +18,7 @@ from app.exceptions.custom_exceptions import (
 
 from app.exceptions import messages as msg
 
-
+from app.models.customer_model import Customer
 class AuthService:
 
     def login(
@@ -27,37 +27,54 @@ class AuthService:
         credentials: LoginRequest,
     ):
         """
-        Authenticate an Admin or Branch Manager
-        and return access and refresh tokens.
+        Authenticate Super Admin, Branch Manager,
+        or Customer and return JWT tokens.
         """
 
-        # First, try to find the user in the Admin table.
+        # -----------------------------------
+        # Check Super Admin
+        # -----------------------------------
         current_user = (
             db.query(User)
             .filter(User.email == credentials.email)
             .first()
         )
 
-        # If no Admin exists with this email,
-        # try to find a Branch Manager.
+        # -----------------------------------
+        # Check Branch Manager
+        # -----------------------------------
         if not current_user:
             current_user = (
                 db.query(BranchManager)
                 .filter(
-                    BranchManager.email
-                    == credentials.email
+                    BranchManager.email == credentials.email
                 )
                 .first()
             )
 
-        # No user exists with the provided email.
+        # -----------------------------------
+        # Check Customer
+        # -----------------------------------
+        if not current_user:
+            current_user = (
+                db.query(Customer)
+                .filter(
+                    Customer.email == credentials.email
+                )
+                .first()
+            )
+
+        # -----------------------------------
+        # User not found
+        # -----------------------------------
         if not current_user:
             raise UnauthorizedException(
                 msg.INVALID_CREDENTIALS
             )
 
-        # Verify the provided password against
-        # the stored hashed password.
+        # -----------------------------------
+        # Verify password
+        # -----------------------------------
         if not verify_password(
             credentials.password,
             current_user.password_hash,
@@ -66,19 +83,25 @@ class AuthService:
                 msg.INVALID_CREDENTIALS
             )
 
-        # Prevent inactive users from logging in.
+        # -----------------------------------
+        # Block inactive account
+        # -----------------------------------
         if not current_user.is_active:
             raise UnauthorizedException(
                 msg.USER_INACTIVE
             )
 
-        # Generate JWT tokens using the role
-        # stored on the authenticated user.
+        # -----------------------------------
+        # Generate Access Token
+        # -----------------------------------
         access_token = create_access_token(
             unique_id=current_user.unique_id,
             role=current_user.role,
         )
 
+        # -----------------------------------
+        # Generate Refresh Token
+        # -----------------------------------
         refresh_token = create_refresh_token(
             unique_id=current_user.unique_id,
             role=current_user.role,

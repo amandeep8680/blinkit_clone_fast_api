@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-
+from typing import Annotated
 from app.database.database import get_db
 
 from app.auth.authorization import require_roles
@@ -23,6 +23,10 @@ from app.services.subcategory_service import (
 
 subcategory_service = SubCategoryService()
 
+DBSession = Annotated[
+    Session,
+    Depends(get_db),
+]
 
 router = APIRouter(
     prefix="/subcategories",

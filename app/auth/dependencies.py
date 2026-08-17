@@ -10,6 +10,7 @@ from app.core.security import decode_token
 
 from app.models.admin_model import User
 from app.models.branchmanager_model import BranchManager
+from app.models.customer_model import Customer
 
 from app.constants import roles
 
@@ -27,12 +28,11 @@ def get_current_user(
     db: Session = Depends(get_db),
 ):
     """
-    Validate the access token and return the
-    authenticated user based on the user's role.
+    Validate access token and return the
+    authenticated user based on JWT role.
     """
 
     token = credentials.credentials
-
     payload = decode_token(token)
 
     # Only access tokens can access protected APIs.
@@ -49,9 +49,10 @@ def get_current_user(
             msg.INVALID_TOKEN
         )
 
-    # Fetch the authenticated user from the correct table.
+    # -----------------------------------
+    # Super Admin
+    # -----------------------------------
     if role == roles.SUPER_ADMIN:
-
         current_user = (
             db.query(User)
             .filter(
@@ -60,12 +61,26 @@ def get_current_user(
             .first()
         )
 
+    # -----------------------------------
+    # Branch Manager
+    # -----------------------------------
     elif role == roles.BRANCH_MANAGER:
-
         current_user = (
             db.query(BranchManager)
             .filter(
                 BranchManager.unique_id == unique_id
+            )
+            .first()
+        )
+
+    # -----------------------------------
+    # Customer
+    # -----------------------------------
+    elif role == roles.CUSTOMER:
+        current_user = (
+            db.query(Customer)
+            .filter(
+                Customer.unique_id == unique_id
             )
             .first()
         )
@@ -75,20 +90,19 @@ def get_current_user(
             msg.INVALID_TOKEN
         )
 
-    # The token belongs to a user that no longer exists.
+    # Token user no longer exists.
     if not current_user:
         raise UnauthorizedException(
             msg.INVALID_TOKEN
         )
 
-    # Block inactive accounts.
+    # Block inactive users.
     if not current_user.is_active:
         raise UnauthorizedException(
             msg.USER_INACTIVE
         )
 
-    # Ensure the role stored in the token
-    # still matches the user's database role.
+    # Ensure JWT role still matches DB role.
     if current_user.role != role:
         raise UnauthorizedException(
             msg.INVALID_TOKEN
