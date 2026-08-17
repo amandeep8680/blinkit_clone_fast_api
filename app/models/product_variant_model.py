@@ -101,3 +101,9 @@ class ProductVariant(Base):
     back_populates="product_variant",
     cascade="all, delete-orphan",
     )
+
+    cart_items = relationship(
+    "CartItem",
+    back_populates="product_variant",
+    cascade="all, delete-orphan",
+)

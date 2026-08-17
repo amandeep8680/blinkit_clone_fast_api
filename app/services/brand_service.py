@@ -242,20 +242,20 @@ class BrandService:
 
         return brand
 
-
     def delete_brand(
         self,
         db: Session,
         brand_unique_id: str,
     ):
-        """
-        Permanently delete a brand.
-        """
-
         brand = self.get_brand(
             db,
             brand_unique_id,
         )
+
+        if brand.products:
+            raise BadRequestException(
+                msg.BRAND_HAS_PRODUCTS
+            )
 
         db.delete(brand)
         db.commit()

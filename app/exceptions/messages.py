@@ -177,3 +177,43 @@ CUSTOMER_ADDRESS_ALREADY_INACTIVE = "Customer address is already inactive."
 
 
 
+
+
+
+# =========================
+# Cart Messages
+# =========================
+
+CART_ALREADY_EXISTS = "Customer already has an active cart."
+CART_NOT_FOUND = "Active cart not found."
+CART_CREATED = "Cart created successfully."
+CART_CLEARED = "Cart cleared successfully."
+
+
+# =========================
+# Cart Item Messages
+# =========================
+
+CART_ITEM_NOT_FOUND = "Cart item not found."
+CART_ITEM_DELETED = "Cart item removed successfully."
+INVALID_CART_QUANTITY = "Cart quantity must be greater than zero."
+CART_QUANTITY_EXCEEDS_STOCK = "Requested quantity exceeds available stock."
+PRODUCT_NOT_AVAILABLE = "Product is not available in this branch."
+PRODUCT_VARIANT_INACTIVE = "Product variant is inactive."
+BRANCH_INACTIVE = "Branch is inactive."
+
+
+
+# =========================
+# Branch Catalog Messages
+# =========================
+
+BRANCH_INACTIVE = (
+    "Selected branch is currently inactive."
+)
+
+
+
+BRAND_HAS_PRODUCTS = (
+    "Brand cannot be deleted because products are linked to it."
+)

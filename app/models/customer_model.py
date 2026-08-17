@@ -89,6 +89,12 @@ class Customer(Base):
         cascade="all, delete-orphan",
     )
 
+    carts = relationship(
+    "Cart",
+    back_populates="customer",
+    cascade="all, delete-orphan",
+)
+
 
 class CustomerAddress(Base):
     __tablename__ = "customer_addresses"

@@ -100,18 +100,18 @@ class BranchInventoryService:
         return inventory
 
 
-    # def get_all_inventory(self, db: Session, skip: int = 0, limit: int = 100):
-    #     """
-    #     Return all inventory records.
-    #     """
+    def get_all_inventory(self, db: Session, skip: int = 0, limit: int = 100):
+        """
+        Return all inventory records.
+        """
 
-    #     return (
-    #         db.query(BranchInventory)
-    #         .order_by(BranchInventory.created_at.desc())
-    #         .offset(skip)
-    #         .limit(limit)
-    #         .all()
-    #     )
+        return (
+            db.query(BranchInventory)
+            .order_by(BranchInventory.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
 
     def get_inventory_by_branch(

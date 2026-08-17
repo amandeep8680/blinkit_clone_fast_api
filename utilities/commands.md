@@ -30,3 +30,9 @@ alembic upgrade head
         
         ## fresh migration
         4 - alembic revision --autogenerate -m "initial schema"
+
+
+
+
+## for api in json
+http://localhost:8000/openapi.json

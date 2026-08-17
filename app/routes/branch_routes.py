@@ -61,6 +61,7 @@ def get_all_branches(
         require_roles(
             roles.SUPER_ADMIN,
             roles.BRANCH_MANAGER,
+            roles.CUSTOMER
         )
     ),
 ):

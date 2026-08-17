@@ -62,27 +62,27 @@ def get_all_inventory_route(
     return inventory_service.get_all_inventory(db, skip, limit)
 
 
-# # =========================================================
-# # Get Inventory By Branch
-# # =========================================================
-# # Returns all inventory items for a branch.
-# @router.get(
-#     "/branch/{branch_unique_id}",
-#     response_model=list[BranchInventoryResponse],
-# )
-# def get_inventory_by_branch_route(
-#     branch_unique_id: str,
-#     skip: int = 0,
-#     limit: int = 100,
-#     db: Session = Depends(get_db),
-#     current_user=Depends(require_roles(SUPER_ADMIN, BRANCH_MANAGER)),
-# ):
-#     return inventory_service.get_inventory_by_branch(
-#         db,
-#         branch_unique_id,
-#         skip,
-#         limit,
-#     )
+# =========================================================
+# Get Inventory By Branch
+# =========================================================
+# Returns all inventory items for a branch.
+@router.get(
+    "/branch/{branch_unique_id}",
+    response_model=list[BranchInventoryResponse],
+)
+def get_inventory_by_branch_route(
+    branch_unique_id: str,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles(SUPER_ADMIN, BRANCH_MANAGER)),
+):
+    return inventory_service.get_inventory_by_branch(
+        db,
+        branch_unique_id,
+        skip,
+        limit,
+    )
 
 
 # =========================================================

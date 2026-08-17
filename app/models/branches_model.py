@@ -85,3 +85,8 @@ class Branch(Base):
     back_populates="branch",
     cascade="all, delete-orphan",
 )
+
+    carts = relationship(
+    "Cart",
+    back_populates="branch",
+)

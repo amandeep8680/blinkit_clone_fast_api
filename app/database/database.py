@@ -13,8 +13,7 @@ if DATABASE_URL is None:
 
 # Create SQLAlchemy Engine
 engine = create_engine(
-    DATABASE_URL,
-    echo=True,          # Prints SQL queries (disable in production)
+    DATABASE_URL,    
     future=True
 )
 
