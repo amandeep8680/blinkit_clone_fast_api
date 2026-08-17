@@ -137,3 +137,15 @@ INVALID_PRODUCT_VARIANT_PRICE = "Selling price cannot be greater than MRP."
 PRODUCT_IMAGE_NOT_FOUND = "Product image not found."
 PRODUCT_IMAGE_DELETED = "Product image deleted successfully."
 PRODUCT_PRIMARY_IMAGE_ALREADY_EXISTS = "A primary image already exists for this product."
+
+# =========================
+# Branch Inventory Messages
+# =========================
+
+INVENTORY_ALREADY_EXISTS = "Inventory item already exists for this branch and product variant."
+INVENTORY_NOT_FOUND = "Inventory item not found."
+INVENTORY_ALREADY_ACTIVE = "Inventory item is already available."
+INVENTORY_ALREADY_INACTIVE = "Inventory item is already unavailable."
+INVENTORY_DELETED = "Inventory item deleted successfully."
+INVALID_STOCK_QUANTITY = "Stock quantity cannot be negative."
+INSUFFICIENT_STOCK = "Insufficient stock available."

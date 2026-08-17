@@ -95,3 +95,9 @@ class ProductVariant(Base):
         "Product",
         back_populates="variants",
     )
+
+    branch_inventory = relationship(
+    "BranchInventory",
+    back_populates="product_variant",
+    cascade="all, delete-orphan",
+    )

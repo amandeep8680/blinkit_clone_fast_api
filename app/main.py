@@ -16,6 +16,7 @@ from app.routes.subcategory_routes import router as subcategory_router
 from app.routes.product_routes import (router as product_router,)
 from app.routes.product_variant_routes import (router as product_variant_router,)
 from app.routes.product_image_routes import (router as product_image_router,)
+from app.routes.branch_inventory_routes import (router as branch_inventory_router ,)
 
 # -----------------------------------
 # Application Lifespan
@@ -81,3 +82,4 @@ app.include_router(subcategory_router)
 app.include_router(product_router)
 app.include_router(product_variant_router)
 app.include_router(product_image_router)
+app.include_router(branch_inventory_router)

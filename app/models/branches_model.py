@@ -78,3 +78,10 @@ class Branch(Base):
         back_populates="branch",
         uselist=False,
     )
+
+
+    inventory_items = relationship(
+    "BranchInventory",
+    back_populates="branch",
+    cascade="all, delete-orphan",
+)
