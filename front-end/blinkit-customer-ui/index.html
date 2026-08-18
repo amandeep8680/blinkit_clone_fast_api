@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0c831f" />
+  <title>Blinkit Fresh — Customer Store</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toastHost" class="toast-host"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Blinkit Fresh home">
+      <span class="brand-mark">B</span>
+      <span>
+        <strong>Blinkit</strong>
+        <small>fresh</small>
+      </span>
+    </a>
+
+    <button id="locationBtn" class="location-pill" type="button">
+      <span class="location-icon">⌖</span>
+      <span class="location-copy">
+        <strong id="deliveryTitle">Select a branch</strong>
+        <small id="deliverySub">Choose where you want to shop</small>
+      </span>
+      <span>⌄</span>
+    </button>
+
+    <label class="search">
+      <span>⌕</span>
+      <input id="searchInput" type="search" placeholder='Search "milk", "chips", "cola"...' autocomplete="off" />
+      <kbd>⌘ K</kbd>
+    </label>
+
+    <button id="accountBtn" class="account-btn" type="button">
+      <span class="avatar">☺</span>
+      <span id="accountText">Login</span>
+    </button>
+
+    <button id="cartBtn" class="cart-btn" type="button">
+      <span class="bag">▣</span>
+      <span>
+        <strong>My Cart</strong>
+        <small id="cartMeta">0 items</small>
+      </span>
+      <span id="cartTotal">₹0</span>
+    </button>
+  </header>
+
+  <main>
+    <section id="guestHero" class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">10-minute inspired grocery experience</div>
+        <h1>Fresh groceries.<br><span>Fast, simple, yours.</span></h1>
+        <p>Login, choose your branch, and shop directly from your FastAPI branch catalog.</p>
+        <div class="hero-actions">
+          <button class="primary-btn" data-open-auth="login">Start shopping</button>
+          <button class="ghost-btn" data-open-auth="register">Create account</button>
+        </div>
+        <div class="trust-row">
+          <span>✓ Branch-based inventory</span>
+          <span>✓ Live API cart</span>
+          <span>✓ Secure Bearer auth</span>
+        </div>
+      </div>
+      <div class="hero-art">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="grocery-card gc1"><b>🥛</b><span>Milk</span><small>Daily essentials</small></div>
+        <div class="grocery-card gc2"><b>🥔</b><span>Snacks</span><small>Crunch time</small></div>
+        <div class="grocery-card gc3"><b>🥤</b><span>Drinks</span><small>Stay refreshed</small></div>
+        <div class="speed-badge"><strong>⚡</strong><span>Fast<br>shopping</span></div>
+      </div>
+    </section>
+
+    <section id="shopView" class="shop hidden">
+      <div class="promo-strip">
+        <div><b>⚡ Fresh picks</b><span>From your selected branch inventory</span></div>
+        <div class="promo-code">API LIVE</div>
+      </div>
+
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Browse your branch</p>
+          <h2>Shop by category</h2>
+        </div>
+        <div id="catalogStatus" class="soft-status">Choose a branch to load products</div>
+      </div>
+
+      <div id="categoryRail" class="category-rail"></div>
+
+      <div class="catalog-toolbar">
+        <div>
+          <h2 id="catalogTitle">All products</h2>
+          <p id="catalogCount">0 items</p>
+        </div>
+        <div class="toolbar-actions">
+          <select id="sortSelect">
+            <option value="featured">Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="name">Name: A–Z</option>
+          </select>
+          <button id="refreshCatalog" class="icon-btn" title="Refresh catalog">↻</button>
+        </div>
+      </div>
+
+      <div id="productGrid" class="product-grid"></div>
+      <div id="emptyCatalog" class="empty-state hidden">
+        <div class="empty-icon">🧺</div>
+        <h3>No products found</h3>
+        <p>Try another search, category, or branch.</p>
+      </div>
+    </section>
+  </main>
+
+  <aside id="cartDrawer" class="drawer">
+    <div class="drawer-head">
+      <div>
+        <p class="eyebrow">Your basket</p>
+        <h2>My Cart</h2>
+      </div>
+      <button class="close-btn" data-close="cartDrawer">×</button>
+    </div>
+
+    <div id="cartBranchNote" class="branch-note hidden"></div>
+    <div id="cartItems" class="cart-items"></div>
+
+    <div id="cartEmpty" class="cart-empty">
+      <div>🛒</div>
+      <h3>Your cart is empty</h3>
+      <p>Add something delicious from the catalog.</p>
+    </div>
+
+    <div id="cartSummary" class="cart-summary hidden">
+      <div class="bill-row"><span>Item total</span><strong id="billSubtotal">₹0</strong></div>
+      <div class="bill-row muted"><span>Delivery</span><span>Calculated by your future order API</span></div>
+      <div class="bill-row total"><span>Grand total</span><strong id="billTotal">₹0</strong></div>
+      <button id="checkoutBtn" class="checkout-btn">
+        <span>Proceed to checkout</span><strong id="checkoutTotal">₹0 →</strong>
+      </button>
+      <button id="clearCartBtn" class="text-btn danger">Clear cart</button>
+    </div>
+  </aside>
+
+  <aside id="accountDrawer" class="drawer">
+    <div class="drawer-head">
+      <div>
+        <p class="eyebrow">Customer center</p>
+        <h2>My Account</h2>
+      </div>
+      <button class="close-btn" data-close="accountDrawer">×</button>
+    </div>
+
+    <div id="profileCard" class="profile-card">
+      <div class="big-avatar">☺</div>
+      <div>
+        <h3 id="profileName">Customer</h3>
+        <p id="profileEmail">—</p>
+        <span id="profileRole" class="role-chip">customer</span>
+      </div>
+    </div>
+
+    <div class="account-section">
+      <div class="section-mini-head">
+        <h3>Saved addresses</h3>
+        <button id="addAddressBtn" class="mini-btn">+ Add</button>
+      </div>
+      <div id="addressList" class="address-list"></div>
+      <div id="addressHint" class="hint-card">Your customer ID is resolved from registration/JWT when possible.</div>
+    </div>
+
+    <div class="account-section">
+      <h3>API settings</h3>
+      <label class="field">
+        <span>Backend URL</span>
+        <input id="settingsApiUrl" value="http://127.0.0.1:8000" />
+      </label>
+      <label class="field">
+        <span>Customer unique ID</span>
+        <input id="settingsCustomerId" placeholder="Auto detected or paste unique_id" />
+      </label>
+      <button id="saveSettingsBtn" class="secondary-btn full">Save settings</button>
+    </div>
+
+    <button id="logoutBtn" class="logout-btn">Log out</button>
+  </aside>
+
+  <div id="overlay" class="overlay"></div>
+
+  <dialog id="authModal" class="modal auth-modal">
+    <button class="modal-x" data-dialog-close="authModal">×</button>
+    <div class="auth-side">
+      <div class="auth-brand"><span>B</span> Blinkit fresh</div>
+      <h2>Everything you need,<br>one branch away.</h2>
+      <p>Customer storefront connected directly to your FastAPI  </p>
+      <div class="auth-visual">🥑 <span>🥛</span> 🍪</div>
+    </div>
+    <div class="auth-form-side">
+      <div class="tabs">
+        <button class="tab active" data-auth-tab="login">Login</button>
+        <button class="tab" data-auth-tab="register">Create account</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <div>
+          <p class="eyebrow">Welcome back</p>
+          <h2>Login to shop</h2>
+        </div>
+        <label class="field"><span>Email</span><input name="email" type="email" required placeholder="you@example.com" /></label>
+        <label class="field"><span>Password</span><input name="password" type="password" required placeholder="••••••••" /></label>
+        <button class="primary-btn full" type="submit">Login</button>
+        <p class="form-note">Uses <code>POST /auth/login</code></p>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden">
+        <div>
+          <p class="eyebrow">New here?</p>
+          <h2>Create customer account</h2>
+        </div>
+        <label class="field"><span>Name</span><input name="name" required placeholder="Aman" /></label>
+        <label class="field"><span>Email</span><input name="email" type="email" required placeholder="you@example.com" /></label>
+        <label class="field"><span>Phone</span><input name="phone" required placeholder="+91 98765 43210" /></label>
+        <label class="field"><span>Password</span><input name="password" type="password" minlength="6" required placeholder="Minimum 6 characters" /></label>
+        <button class="primary-btn full" type="submit">Create account</button>
+        <p class="form-note">Registers via <code>POST /customers/register</code>, then logs you in.</p>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="branchModal" class="modal small-modal">
+    <button class="modal-x" data-dialog-close="branchModal">×</button>
+    <p class="eyebrow">Delivery location</p>
+    <h2>Choose your branch</h2>
+    <p class="modal-sub">Products are loaded from that branch's live catalog.</p>
+    <div id="branchList" class="branch-list"></div>
+  </dialog>
+
+  <dialog id="addressModal" class="modal small-modal">
+    <button class="modal-x" data-dialog-close="addressModal">×</button>
+    <p class="eyebrow">Delivery details</p>
+    <h2>Add an address</h2>
+    <form id="addressForm" class="address-form">
+      <label class="field"><span>Label</span><input name="label" required placeholder="Home / Work" /></label>
+      <label class="field"><span>Address line</span><textarea name="address_line" required placeholder="House, street, area"></textarea></label>
+      <label class="field"><span>Landmark</span><input name="landmark" placeholder="Optional" /></label>
+      <div class="field-row">
+        <label class="field"><span>City</span><input name="city" required /></label>
+        <label class="field"><span>State</span><input name="state" required /></label>
+      </div>
+      <label class="field"><span>Pincode</span><input name="pincode" required /></label>
+      <label class="check-line"><input type="checkbox" name="is_default" /> Make this my default address</label>
+      <button class="primary-btn full" type="submit">Save address</button>
+    </form>
+  </dialog>
+
+  <dialog id="productModal" class="modal product-modal">
+    <button class="modal-x" data-dialog-close="productModal">×</button>
+    <div id="productModalBody"></div>
+  </dialog>
+
+  <dialog id="infoModal" class="modal small-modal">
+    <button class="modal-x" data-dialog-close="infoModal">×</button>
+    <div class="info-art">🚧</div>
+    <h2>Checkout API not in your spec yet</h2>
+    <p class="modal-sub">Your current OpenAPI includes cart APIs, but no order/checkout endpoint. The UI stops here instead of inventing a backend contract.</p>
+    <button class="primary-btn full" data-dialog-close="infoModal">Got it</button>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
