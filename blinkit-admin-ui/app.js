@@ -3654,102 +3654,393 @@ function deleteCategory(id) {
 // INVENTORY
 // ============================================================
 
-async function renderInventory() {
-  const rows =
-    await api(
-      "/inventory"
-    );
+// NOTE:
+// GET /inventory currently does not return branch_unique_id or
+// product_variant_unique_id. Because of that, this admin screen
+// verifies the exact (branch, variant) pair using:
+// GET /inventory/branch/{branch_unique_id}/variant/{variant_unique_id}
+//
+// Product names are resolved from:
+// GET /products
+// GET /products/{product_unique_id}/details
+//
+// This gives us a correct table:
+// Branch -> Product -> Variant -> Inventory
 
 
-  state.data.inventory =
-    rows;
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (true) {
+      const index = nextIndex++;
+
+      if (index >= items.length) {
+        return;
+      }
+
+      try {
+        results[index] = await worker(items[index], index);
+      } catch (error) {
+        results[index] = null;
+        console.warn("Inventory lookup worker failed", error);
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    () => runWorker()
+  );
+
+  await Promise.all(workers);
+
+  return results;
+}
 
 
-  $("#content")
-    .innerHTML = `
-      <div class="toolbar">
+async function loadInventoryProductLookup(force = false) {
+  if (
+    !force &&
+    Array.isArray(state.data.inventoryProductLookup)
+  ) {
+    return state.data.inventoryProductLookup;
+  }
 
-        <div class="search">
+  const products = await api(
+    "/products?skip=0&limit=1000"
+  );
 
-          <input
-            id="inv-search"
-            placeholder="Search inventory response..."
-          >
-
-        </div>
-
-
-        <div class="toolbar-actions">
-
-          <button
-            class="secondary-btn"
-            onclick="openStockAction()"
-          >
-            ± Adjust stock
-          </button>
-
-          <button
-            class="primary-btn"
-            onclick="openInventoryCreate()"
-          >
-            ＋ Add inventory
-          </button>
-
-        </div>
-
-      </div>
-
-
-      <div class="panel">
-
-        <div class="panel-head">
-
-          <div>
-
-            <h3>
-              Branch inventory
-            </h3>
-
-            <p>
-              ${rows.length}
-              inventory rows
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div
-          class="table-wrap"
-          id="inv-table"
-        >
-          ${inventoryTable(rows)}
-        </div>
-
-      </div>
-    `;
-
-
-  $("#inv-search")
-    .oninput =
-    (e) => {
-      const q =
-        e.target.value
-          .toLowerCase();
-
-
-      $("#inv-table")
-        .innerHTML =
-        inventoryTable(
-          rows.filter(
-            (row) =>
-              JSON.stringify(row)
-                .toLowerCase()
-                .includes(q)
-          )
+  const details = await mapWithConcurrency(
+    products,
+    6,
+    async (product) => {
+      try {
+        return await api(
+          `/products/${encodeURIComponent(product.unique_id)}/details`
         );
-    };
+      } catch (error) {
+        console.warn(
+          `Could not load product details: ${product.name}`,
+          error
+        );
+
+        return {
+          ...product,
+          brand: null,
+          subcategory: null,
+          variants: [],
+        };
+      }
+    }
+  );
+
+  const lookup = [];
+
+  for (const product of details.filter(Boolean)) {
+    for (const variant of product.variants || []) {
+      lookup.push({
+        product_unique_id: product.unique_id,
+        product_name: product.name,
+        product_slug: product.slug,
+        product_is_active: product.is_active,
+
+        brand_name: product.brand?.name || "—",
+        subcategory_name: product.subcategory?.name || "—",
+
+        product_variant_unique_id: variant.unique_id,
+        sku: variant.sku,
+        value: variant.value,
+        unit: variant.unit,
+        mrp: variant.mrp,
+        selling_price: variant.selling_price,
+        variant_is_active: variant.is_active,
+      });
+    }
+  }
+
+  state.data.inventoryProductLookup = lookup;
+
+  return lookup;
+}
+
+
+async function getExactInventory(branchId, variantId) {
+  try {
+    return await api(
+      `/inventory/branch/${encodeURIComponent(branchId)}/variant/${encodeURIComponent(variantId)}`
+    );
+  } catch (error) {
+    // Missing mapping is normal while scanning possible combinations.
+    if (error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+
+async function loadAllInventoryAssignments(force = false) {
+  if (
+    !force &&
+    Array.isArray(state.data.inventoryAssignments)
+  ) {
+    return state.data.inventoryAssignments;
+  }
+
+  const [branches, variantLookup] = await Promise.all([
+    api("/branches/"),
+    loadInventoryProductLookup(force),
+  ]);
+
+  state.data.branches = branches;
+  state.relations.branches = branches;
+
+  const pairs = [];
+
+  for (const branch of branches) {
+    for (const variant of variantLookup) {
+      pairs.push({
+        branch,
+        variant,
+      });
+    }
+  }
+
+  const checked = await mapWithConcurrency(
+    pairs,
+    10,
+    async ({ branch, variant }) => {
+      const inventory = await getExactInventory(
+        branch.unique_id,
+        variant.product_variant_unique_id
+      );
+
+      if (!inventory) {
+        return null;
+      }
+
+      return {
+        branch_unique_id: branch.unique_id,
+        branch_name: branch.name,
+        branch_city: branch.city,
+        branch_pincode: branch.pincode,
+
+        product_unique_id: variant.product_unique_id,
+        product_name: variant.product_name,
+        product_slug: variant.product_slug,
+        product_is_active: variant.product_is_active,
+
+        brand_name: variant.brand_name,
+        subcategory_name: variant.subcategory_name,
+
+        product_variant_unique_id:
+          variant.product_variant_unique_id,
+
+        sku: variant.sku,
+        value: variant.value,
+        unit: variant.unit,
+        mrp: variant.mrp,
+        selling_price: variant.selling_price,
+        variant_is_active: variant.variant_is_active,
+
+        stock_quantity: inventory.stock_quantity,
+        selling_price_override:
+          inventory.selling_price_override,
+        is_available: inventory.is_available,
+        created_at: inventory.created_at,
+        updated_at: inventory.updated_at,
+      };
+    }
+  );
+
+  const rows = checked
+    .filter(Boolean)
+    .sort((a, b) => {
+      const branchCompare = String(a.branch_name).localeCompare(
+        String(b.branch_name)
+      );
+
+      if (branchCompare !== 0) {
+        return branchCompare;
+      }
+
+      const productCompare = String(a.product_name).localeCompare(
+        String(b.product_name)
+      );
+
+      if (productCompare !== 0) {
+        return productCompare;
+      }
+
+      return String(a.sku).localeCompare(String(b.sku));
+    });
+
+  state.data.inventoryAssignments = rows;
+  state.data.inventory = rows;
+
+  return rows;
+}
+
+
+async function renderInventory() {
+  // Clear old cached result so Refresh always checks real inventory.
+  delete state.data.inventoryAssignments;
+  delete state.data.inventoryProductLookup;
+
+  const branches = await api("/branches/");
+
+  state.data.branches = branches;
+  state.relations.branches = branches;
+
+  // Render shell first so the user can see what is happening.
+  $("#content").innerHTML = `
+    <div class="toolbar">
+
+      <div class="search">
+        <input
+          id="inv-search"
+          placeholder="Search branch, product, SKU, brand..."
+          disabled
+        >
+      </div>
+
+      <div class="toolbar-actions">
+
+        <select
+          id="inv-branch-filter"
+          disabled
+          style="
+            min-width:220px;
+            padding:11px;
+            border:1px solid var(--line);
+            border-radius:10px;
+          "
+        >
+          <option value="">
+            All branches
+          </option>
+
+          ${branches
+            .map(
+              (branch) => `
+                <option value="${escapeHtml(branch.unique_id)}">
+                  ${escapeHtml(branch.name)}
+                  ${branch.city ? ` — ${escapeHtml(branch.city)}` : ""}
+                </option>
+              `
+            )
+            .join("")}
+        </select>
+
+        <button
+          class="secondary-btn"
+          onclick="openStockAction()"
+        >
+          ± Adjust stock
+        </button>
+
+        <button
+          class="primary-btn"
+          onclick="openInventoryCreate()"
+        >
+          ＋ Assign Product
+        </button>
+
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>
+            Branch inventory
+          </h3>
+
+          <p id="inventory-count-text">
+            Checking branch-product assignments…
+          </p>
+        </div>
+      </div>
+
+      <div class="panel-body" id="inventory-loading">
+        <div class="skeleton"></div>
+        <br>
+        <div class="skeleton" style="width:82%"></div>
+        <br>
+        <div class="skeleton" style="width:64%"></div>
+      </div>
+
+      <div
+        class="table-wrap"
+        id="inv-table"
+      ></div>
+    </div>
+  `;
+
+  const rows = await loadAllInventoryAssignments(true);
+
+  const loading = $("#inventory-loading");
+
+  if (loading) {
+    loading.remove();
+  }
+
+  const searchInput = $("#inv-search");
+  const branchFilter = $("#inv-branch-filter");
+
+  searchInput.disabled = false;
+  branchFilter.disabled = false;
+
+  $("#inventory-count-text").textContent =
+    `${rows.length} actual branch-product variant assignment${
+      rows.length === 1 ? "" : "s"
+    }`;
+
+  $("#inv-table").innerHTML = inventoryTable(rows);
+
+  function applyFilters() {
+    const query = searchInput.value.trim().toLowerCase();
+    const branchId = branchFilter.value;
+
+    const filtered = rows.filter((row) => {
+      const branchMatches =
+        !branchId || row.branch_unique_id === branchId;
+
+      const queryMatches =
+        !query ||
+        [
+          row.branch_name,
+          row.branch_city,
+          row.branch_pincode,
+          row.product_name,
+          row.product_slug,
+          row.brand_name,
+          row.subcategory_name,
+          row.sku,
+          row.value,
+          row.unit,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+
+      return branchMatches && queryMatches;
+    });
+
+    $("#inv-table").innerHTML = inventoryTable(filtered);
+
+    $("#inventory-count-text").textContent =
+      `${filtered.length} of ${rows.length} assignment${
+        rows.length === 1 ? "" : "s"
+      } shown`;
+  }
+
+  searchInput.oninput = applyFilters;
+  branchFilter.onchange = applyFilters;
 }
 
 
@@ -3757,305 +4048,383 @@ async function renderInventory() {
 // INVENTORY TABLE
 // ============================================================
 
-function inventoryTable(
-  rows
-) {
+function inventoryTable(rows) {
   if (!rows.length) {
     return `
       <div class="empty">
-
-        <div class="big">
-          ▥
-        </div>
+        <div class="big">▥</div>
 
         <b>
-          No inventory rows
+          No assigned inventory found
         </b>
 
         <p>
-          Add a branch/product
-          variant mapping to start
-          managing stock.
+          This filter/branch has no product variants assigned in inventory.
+          Use “Assign Product” to create a branch-product mapping.
         </p>
-
       </div>
     `;
   }
 
-
-  const keys = [
-    "stock_quantity",
-    "selling_price_override",
-    "is_available",
-    "created_at",
-    "updated_at",
-  ];
-
-
   return `
     <table class="data-table">
-
       <thead>
         <tr>
-
-          ${
-            keys
-              .map(
-                (key) =>
-                  `
-                    <th>
-                      ${key.replaceAll("_", " ")}
-                    </th>
-                  `
-              )
-              .join("")
-          }
-
-          <th>
-            Raw
-          </th>
-
+          <th>Branch</th>
+          <th>Product</th>
+          <th>Brand</th>
+          <th>Variant</th>
+          <th>SKU</th>
+          <th>Stock</th>
+          <th>MRP</th>
+          <th>Selling Price</th>
+          <th>Inventory Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
 
-
       <tbody>
+        ${rows
+          .map((row) => {
+            const effectivePrice =
+              row.selling_price_override != null
+                ? row.selling_price_override
+                : row.selling_price;
 
-        ${
-          rows
-            .map(
-              (row) => `
-                <tr>
+            const sellableNow =
+              row.is_available === true &&
+              Number(row.stock_quantity) > 0 &&
+              row.variant_is_active !== false &&
+              row.product_is_active !== false;
 
-                  ${
-                    keys
-                      .map(
-                        (key) =>
-                          `
-                            <td>
-                              ${cell(
-                                key,
-                                row[key],
-                                row
-                              )}
-                            </td>
-                          `
-                      )
-                      .join("")
-                  }
+            return `
+              <tr>
+                <td>
+                  <span class="row-title">
+                    ${escapeHtml(row.branch_name)}
+                  </span>
 
-                  <td>
+                  <span class="row-sub">
+                    ${escapeHtml(
+                      [row.branch_city, row.branch_pincode]
+                        .filter(Boolean)
+                        .join(" • ")
+                    )}
+                  </span>
+                </td>
+
+                <td>
+                  <span class="row-title">
+                    ${escapeHtml(row.product_name)}
+                  </span>
+
+                  <span class="row-sub">
+                    ${escapeHtml(row.subcategory_name)}
+                  </span>
+                </td>
+
+                <td>
+                  ${escapeHtml(row.brand_name)}
+                </td>
+
+                <td>
+                  <b>
+                    ${escapeHtml(row.value)} ${escapeHtml(row.unit)}
+                  </b>
+                </td>
+
+                <td>
+                  <span class="badge role">
+                    ${escapeHtml(row.sku)}
+                  </span>
+                </td>
+
+                <td>
+                  <b>${escapeHtml(row.stock_quantity)}</b>
+                </td>
+
+                <td>
+                  ₹${escapeHtml(row.mrp)}
+                </td>
+
+                <td>
+                  <b>
+                    ₹${escapeHtml(effectivePrice)}
+                  </b>
+
+                  <span class="row-sub">
+                    ${
+                      row.selling_price_override != null
+                        ? "Branch override"
+                        : "Default price"
+                    }
+                  </span>
+                </td>
+
+                <td>
+                  <span class="badge ${sellableNow ? "on" : "off"}">
+                    ● ${sellableNow ? "Sellable" : "Not sellable"}
+                  </span>
+
+                  <span class="row-sub">
+                    inventory=${row.is_available ? "on" : "off"},
+                    stock=${escapeHtml(row.stock_quantity)}
+                  </span>
+                </td>
+
+                <td>
+                  <div class="actions">
+                    <button
+                      class="action-btn"
+                      onclick='openQuickInventoryStock(
+                        ${JSON.stringify(row.branch_unique_id)},
+                        ${JSON.stringify(row.product_variant_unique_id)},
+                        ${JSON.stringify(row.product_name)},
+                        ${JSON.stringify(`${row.value} ${row.unit}`)}
+                      )'
+                    >
+                      Stock
+                    </button>
 
                     <button
                       class="action-btn"
-                      onclick='showRaw(
-                        ${JSON.stringify(row)}
+                      onclick='toggleInventoryAvailability(
+                        ${JSON.stringify(row.branch_unique_id)},
+                        ${JSON.stringify(row.product_variant_unique_id)},
+                        ${!!row.is_available}
                       )'
                     >
-                      View
+                      ${row.is_available ? "Disable" : "Enable"}
                     </button>
 
-                  </td>
+                    <button
+                      class="action-btn"
+                      onclick='showRaw(${JSON.stringify(row)})'
+                    >
+                      Details
+                    </button>
 
-                </tr>
-              `
-            )
-            .join("")
-        }
-
+                    <button
+                      class="action-btn danger"
+                      onclick='removeInventoryAssignment(
+                        ${JSON.stringify(row.branch_unique_id)},
+                        ${JSON.stringify(row.product_variant_unique_id)},
+                        ${JSON.stringify(row.branch_name)},
+                        ${JSON.stringify(row.product_name)}
+                      )'
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("")}
       </tbody>
-
     </table>
   `;
 }
 
 
 // ============================================================
-// CREATE INVENTORY
-//
-// branch_unique_id + product_variant_unique_id
-// automatically become dropdowns
+// CREATE INVENTORY / ASSIGN PRODUCT TO BRANCH
 // ============================================================
 
 async function openInventoryCreate() {
-  // Always refresh because inventory relies
-  // on latest branches/variants.
-  await Promise.all([
-    loadRelation(
-      "branch_unique_id",
-      true
-    ),
-
-    loadRelation(
-      "product_variant_unique_id",
-      true
-    ),
+  const [branches, variants] = await Promise.all([
+    api("/branches/"),
+    loadInventoryProductLookup(true),
   ]);
 
+  const branchOptions = branches
+    .filter((branch) => branch.is_active !== false)
+    .map(
+      (branch) => `
+        <option value="${escapeHtml(branch.unique_id)}">
+          ${escapeHtml(branch.name)}
+          ${branch.city ? ` — ${escapeHtml(branch.city)}` : ""}
+        </option>
+      `
+    )
+    .join("");
 
-  const body =
-    await formFields(
-      "BranchInventoryCreate"
-    );
-
+  const variantOptions = variants
+    .filter(
+      (item) =>
+        item.product_is_active !== false &&
+        item.variant_is_active !== false
+    )
+    .map(
+      (item) => `
+        <option value="${escapeHtml(item.product_variant_unique_id)}">
+          ${escapeHtml(item.product_name)} —
+          ${escapeHtml(item.value)} ${escapeHtml(item.unit)} —
+          ${escapeHtml(item.sku)}
+        </option>
+      `
+    )
+    .join("");
 
   openModal({
-    title:
-      "Add branch inventory",
+    title: "Assign product to branch",
+    kicker: "BRANCH INVENTORY",
 
-    body,
+    body: `
+      <label class="field">
+        <span>Branch *</span>
 
-    submit:
-      "Create inventory",
+        <select name="branch_unique_id" required>
+          <option value="">Choose branch…</option>
+          ${branchOptions}
+        </select>
+      </label>
 
-    onSubmit:
-      async (data) => {
+      <label class="field full">
+        <span>Product Variant *</span>
 
-        await api(
-          "/inventory",
-          {
-            method:
-              "POST",
+        <select name="product_variant_unique_id" required>
+          <option value="">Choose product / variant…</option>
+          ${variantOptions}
+        </select>
 
-            body:
-              JSON.stringify(
-                data
-              ),
-          }
-        );
+        <small>
+          Product name, size and SKU are shown; UUID is sent to the API automatically.
+        </small>
+      </label>
 
+      <label class="field">
+        <span>Stock Quantity *</span>
 
-        toast(
-          "Inventory created"
-        );
+        <input
+          name="stock_quantity"
+          type="number"
+          min="0"
+          value="0"
+          required
+        >
+      </label>
 
+      <label class="field">
+        <span>Selling Price Override</span>
 
-        closeModal();
+        <input
+          name="selling_price_override"
+          type="number"
+          min="0.01"
+          step="0.01"
+          placeholder="Leave blank for default price"
+        >
+      </label>
 
-        navigate(
-          "inventory"
-        );
-      },
+      <label class="field">
+        <span>Available *</span>
+
+        <select name="is_available" required>
+          <option value="true" selected>Yes</option>
+          <option value="false">No</option>
+        </select>
+      </label>
+    `,
+
+    submit: "Assign Product",
+
+    onSubmit: async (data) => {
+      await api("/inventory", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+
+      delete state.data.inventoryAssignments;
+
+      toast(
+        "Product assigned",
+        "This exact product variant is now mapped to the selected branch."
+      );
+
+      closeModal();
+      navigate("inventory");
+    },
   });
 }
 
 
 // ============================================================
 // STOCK ACTION
-//
-// Raw UUID fields replaced with dropdowns
 // ============================================================
 
 async function openStockAction() {
-  const [
-    branches,
-    variants,
-  ] = await Promise.all([
-    loadRelation(
-      "branch_unique_id",
-      true
-    ),
+  const rows = await loadAllInventoryAssignments();
 
-    loadRelation(
-      "product_variant_unique_id",
-      true
-    ),
-  ]);
+  if (!rows.length) {
+    toast(
+      "No inventory assignments",
+      "Assign a product to a branch first.",
+      "error"
+    );
 
+    return;
+  }
 
-  const branchOptions =
-    branches
-      .map(
-        (branch) => `
-          <option
-            value="${escapeHtml(branch.unique_id)}"
-          >
-            ${escapeHtml(
-              relationConfig
-                .branch_unique_id
-                .label(branch)
-            )}
-          </option>
-        `
-      )
-      .join("");
+  const branches = [
+    ...new Map(
+      rows.map((row) => [
+        row.branch_unique_id,
+        {
+          unique_id: row.branch_unique_id,
+          name: row.branch_name,
+          city: row.branch_city,
+        },
+      ])
+    ).values(),
+  ];
 
-
-  const variantOptions =
-    variants
-      .map(
-        (variant) => `
-          <option
-            value="${escapeHtml(variant.unique_id)}"
-          >
-            ${escapeHtml(
-              relationConfig
-                .product_variant_unique_id
-                .label(variant)
-            )}
-          </option>
-        `
-      )
-      .join("");
-
+  const branchOptions = branches
+    .map(
+      (branch) => `
+        <option value="${escapeHtml(branch.unique_id)}">
+          ${escapeHtml(branch.name)}
+          ${branch.city ? ` — ${escapeHtml(branch.city)}` : ""}
+        </option>
+      `
+    )
+    .join("");
 
   openModal({
-    title:
-      "Adjust stock",
-
-    kicker:
-      "INCREASE / DECREASE",
+    title: "Adjust stock",
+    kicker: "ASSIGNED INVENTORY ONLY",
 
     body: `
       <label class="field">
-
-        <span>
-          Branch *
-        </span>
+        <span>Branch *</span>
 
         <select
+          id="stock-branch-select"
           name="branch_unique_id"
           required
         >
-
-          <option value="">
-            Choose branch
-          </option>
-
+          <option value="">Choose branch…</option>
           ${branchOptions}
-
         </select>
-
       </label>
 
-
-      <label class="field">
-
-        <span>
-          Product Variant *
-        </span>
+      <label class="field full">
+        <span>Assigned Product Variant *</span>
 
         <select
+          id="stock-variant-select"
           name="product_variant_unique_id"
           required
+          disabled
         >
-
           <option value="">
-            Choose product variant
+            Choose branch first…
           </option>
-
-          ${variantOptions}
-
         </select>
-
       </label>
 
-
       <label class="field">
-
-        <span>
-          Quantity *
-        </span>
+        <span>Quantity *</span>
 
         <input
           name="quantity"
@@ -4063,18 +4432,12 @@ async function openStockAction() {
           min="1"
           required
         >
-
       </label>
 
-
       <label class="field">
-
-        <span>
-          Action
-        </span>
+        <span>Action</span>
 
         <select name="action">
-
           <option value="increase-stock">
             Increase stock
           </option>
@@ -4082,54 +4445,232 @@ async function openStockAction() {
           <option value="decrease-stock">
             Decrease stock
           </option>
-
         </select>
-
       </label>
     `,
 
-    submit:
-      "Apply stock change",
+    submit: "Apply stock change",
 
-    onSubmit:
-      async (data) => {
+    onSubmit: async (data) => {
+      await api(
+        `/inventory/branch/${encodeURIComponent(
+          data.branch_unique_id
+        )}/variant/${encodeURIComponent(
+          data.product_variant_unique_id
+        )}/${data.action}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            quantity: Number(data.quantity),
+          }),
+        }
+      );
 
-        const path =
-          `/inventory/branch/${encodeURIComponent(
-            data.branch_unique_id
-          )}/variant/${encodeURIComponent(
-            data.product_variant_unique_id
-          )}/${data.action}`;
+      delete state.data.inventoryAssignments;
+
+      toast("Stock updated");
+
+      closeModal();
+      navigate("inventory");
+    },
+  });
+
+  const branchSelect = $("#stock-branch-select");
+  const variantSelect = $("#stock-variant-select");
+
+  branchSelect.onchange = () => {
+    const branchId = branchSelect.value;
+
+    const assigned = rows.filter(
+      (row) => row.branch_unique_id === branchId
+    );
+
+    variantSelect.innerHTML = `
+      <option value="">
+        Choose assigned product / variant…
+      </option>
+
+      ${assigned
+        .map(
+          (row) => `
+            <option value="${escapeHtml(row.product_variant_unique_id)}">
+              ${escapeHtml(row.product_name)} —
+              ${escapeHtml(row.value)} ${escapeHtml(row.unit)} —
+              ${escapeHtml(row.sku)} —
+              stock ${escapeHtml(row.stock_quantity)}
+            </option>
+          `
+        )
+        .join("")}
+    `;
+
+    variantSelect.disabled = !branchId;
+  };
+}
 
 
-        await api(
-          path,
-          {
-            method:
-              "PATCH",
+// ============================================================
+// QUICK STOCK UPDATE FROM TABLE ROW
+// ============================================================
 
-            body:
-              JSON.stringify({
-                quantity:
-                  Number(
-                    data.quantity
-                  ),
-              }),
-          }
-        );
+function openQuickInventoryStock(
+  branchId,
+  variantId,
+  productName,
+  variantName
+) {
+  openModal({
+    title: `Adjust Stock — ${productName}`,
+    kicker: variantName,
+
+    body: `
+      <label class="field">
+        <span>Quantity *</span>
+
+        <input
+          name="quantity"
+          type="number"
+          min="1"
+          required
+        >
+      </label>
+
+      <label class="field">
+        <span>Action</span>
+
+        <select name="action">
+          <option value="increase-stock">
+            Increase stock
+          </option>
+
+          <option value="decrease-stock">
+            Decrease stock
+          </option>
+        </select>
+      </label>
+    `,
+
+    submit: "Update Stock",
+
+    onSubmit: async (data) => {
+      await api(
+        `/inventory/branch/${encodeURIComponent(
+          branchId
+        )}/variant/${encodeURIComponent(
+          variantId
+        )}/${data.action}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            quantity: Number(data.quantity),
+          }),
+        }
+      );
+
+      delete state.data.inventoryAssignments;
+
+      toast("Stock updated", productName);
+
+      closeModal();
+      navigate("inventory");
+    },
+  });
+}
 
 
-        toast(
-          "Stock updated"
-        );
+// ============================================================
+// ENABLE / DISABLE AN INVENTORY ASSIGNMENT
+// ============================================================
+
+async function toggleInventoryAvailability(
+  branchId,
+  variantId,
+  currentlyAvailable
+) {
+  try {
+    await api(
+      `/inventory/branch/${encodeURIComponent(
+        branchId
+      )}/variant/${encodeURIComponent(
+        variantId
+      )}/${currentlyAvailable ? "deactivate" : "activate"}`,
+      {
+        method: "PATCH",
+      }
+    );
+
+    delete state.data.inventoryAssignments;
+
+    toast(
+      currentlyAvailable
+        ? "Inventory disabled"
+        : "Inventory enabled"
+    );
+
+    navigate("inventory");
+  } catch (error) {
+    if ([401, 403].includes(error.status)) {
+      return renderUnauthorized(error);
+    }
+
+    toast(
+      "Inventory action failed",
+      error.message,
+      "error"
+    );
+  }
+}
 
 
-        closeModal();
+// ============================================================
+// REMOVE BRANCH-PRODUCT INVENTORY MAPPING
+// ============================================================
 
-        navigate(
-          "inventory"
-        );
-      },
+function removeInventoryAssignment(
+  branchId,
+  variantId,
+  branchName,
+  productName
+) {
+  openModal({
+    title: "Remove inventory assignment",
+    kicker: "DESTRUCTIVE ACTION",
+
+    body: `
+      <div class="danger-box full">
+        Remove
+        <b>${escapeHtml(productName)}</b>
+        from
+        <b>${escapeHtml(branchName)}</b>?
+
+        <br><br>
+
+        This removes only this branch + product variant inventory mapping.
+      </div>
+    `,
+
+    submit: "Remove Assignment",
+
+    onSubmit: async () => {
+      await api(
+        `/inventory/branch/${encodeURIComponent(
+          branchId
+        )}/variant/${encodeURIComponent(variantId)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      delete state.data.inventoryAssignments;
+
+      toast(
+        "Inventory assignment removed",
+        `${productName} removed from ${branchName}`
+      );
+
+      closeModal();
+      navigate("inventory");
+    },
   });
 }
 

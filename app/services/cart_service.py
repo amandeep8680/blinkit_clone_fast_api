@@ -344,3 +344,21 @@ class CartService:
         return {
             "message": msg.CART_CLEARED
         }
+
+
+    # =====================================================
+    # Delete Cart
+    # =====================================================
+
+    def delete_cart(self, db: Session, customer):
+        cart = self.get_active_cart(
+            db,
+            customer,
+        )
+
+        db.delete(cart)
+        db.commit()
+
+        return {
+            "message": msg.CART_DELETED
+        }

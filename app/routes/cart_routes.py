@@ -151,17 +151,33 @@ def remove_cart_item(
 
 
 # =========================================================
-# Clear Complete Cart
+# Clear Complete Cart items
 # =========================================================
 @router.delete(
     "/clear",
     status_code=status.HTTP_200_OK,
 )
-def clear_cart(
+def clear_cart_items(
     db: DBSession,
     current_user: CurrentCustomer,
 ):
     return cart_service.clear_cart(
+        db=db,
+        customer=current_user,
+    )
+
+# =========================================================
+# Delete Complete Cart 
+# =========================================================
+@router.delete(
+    "/delete",
+    status_code=status.HTTP_200_OK,
+)
+def delete_cart(
+    db: DBSession,
+    current_user: CurrentCustomer,
+):
+    return cart_service.delete_cart(
         db=db,
         customer=current_user,
     )

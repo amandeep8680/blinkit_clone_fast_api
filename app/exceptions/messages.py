@@ -217,3 +217,12 @@ BRANCH_INACTIVE = (
 BRAND_HAS_PRODUCTS = (
     "Brand cannot be deleted because products are linked to it."
 )
+
+
+# =========================
+# Cart Related Messages
+# =========================
+
+CART_CREATED = "Cart created successfully"
+CART_CLEARED = "Cart cleared successfully"
+CART_DELETED = "Cart deleted successfully"

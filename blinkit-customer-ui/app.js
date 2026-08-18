@@ -336,7 +336,42 @@ $("#accountBtn").onclick=()=>state.accessToken?openDrawer("accountDrawer"):openD
 $("#cartBtn").onclick=async()=>{if(!state.accessToken){openDialog("authModal");return}try{await loadCart()}catch(e){toast(readableError(e),"error")}openDrawer("cartDrawer")};
 $("#locationBtn").onclick=async()=>{if(!state.accessToken){openDialog("authModal");return}if(!state.branches.length){try{await loadBranches()}catch(e){toast(readableError(e),"error")}}openDialog("branchModal")};
 $("#checkoutBtn").onclick=()=>openDialog("infoModal");
-$("#clearCartBtn").onclick=async()=>{try{await api("/cart/clear",{method:"DELETE"});await loadCart();toast("Cart cleared")}catch(e){toast(readableError(e),"error")}};
+// $("#clearCartBtn").onclick=async()=>{try{await api("/cart/clear",{method:"DELETE"});await loadCart();toast("Cart cleared")}catch(e){toast(readableError(e),"error")}};
+$("#clearCartBtn").onclick = async () => {
+  try {
+
+    await api(
+      "/cart/delete",
+      {
+        method: "DELETE"
+      }
+    );
+
+    state.cart = null;
+
+    if ("cartItems" in state) {
+      state.cartItems = [];
+    }
+
+    toast(
+      "Cart deleted successfully"
+    );
+
+    closeDrawers();
+
+  } catch (e) {
+
+    console.error(
+      "Delete cart failed:",
+      e
+    );
+
+    toast(
+      readableError(e),
+      "error"
+    );
+  }
+};
 $("#refreshCatalog").onclick=()=>loadCatalog().catch(e=>toast(readableError(e),"error"));
 $("#searchInput").oninput=e=>{state.search=e.target.value;renderProducts()};
 $("#sortSelect").onchange=e=>{state.sort=e.target.value;renderProducts()};

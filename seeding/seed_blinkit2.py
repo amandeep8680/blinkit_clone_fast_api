@@ -16,11 +16,11 @@ Install:
     pip install requests
 
 Run:
-    python seed_second_branch.py \
+    python seed_blinkit2.py \
         --base-url http://127.0.0.1:8000 \
-        --email admin@example.com \
-        --password your_password \
-        --branch-id SECOND_BRANCH_UNIQUE_ID
+        --email deep@singh.com \
+        --password 12345 \
+        --branch-id 9bd23a89-3c74-43d2-b584-0394b91d00d3
 """
 
 import argparse
