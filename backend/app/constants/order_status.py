@@ -15,7 +15,7 @@ ORDER_STATUSES = (
 )
 
 
-PAYMENT_PENDING = "pending"
+PAYMENT_PENDING = "pending"     
 PAYMENT_PAID = "paid"
 PAYMENT_FAILED = "failed"
 PAYMENT_REFUNDED = "refunded"

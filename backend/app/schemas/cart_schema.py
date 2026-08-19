@@ -51,13 +51,20 @@ class CartProductVariantResponse(BaseModel):
 
 class CartItemResponse(BaseModel):
     quantity: int
+
+    is_available: bool
+    available_stock: int
+    availability_message: str | None = None
+
     product_variant: CartProductVariantResponse
+
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(
         from_attributes=True
     )
+
 
 
 # =========================================================
@@ -73,10 +80,12 @@ class CartBranchResponse(BaseModel):
         from_attributes=True
     )
 
-
 class CartResponse(BaseModel):
     is_active: bool
+    can_checkout: bool
+
     branch: CartBranchResponse
+
     items: list[CartItemResponse] = Field(
         default_factory=list
     )

@@ -222,11 +222,29 @@ BRAND_HAS_PRODUCTS = (
 # =========================
 # Cart Related Messages
 # =========================
+CART_ALREADY_EXISTS = "Customer already has an active cart."
+CART_NOT_FOUND = "Active cart not found."
+CART_CLEARED = "Cart cleared successfully."
+CART_DELETED = "Cart deleted successfully."
 
-CART_CREATED = "Cart created successfully"
-CART_CLEARED = "Cart cleared successfully"
-CART_DELETED = "Cart deleted successfully"
+CART_ITEM_NOT_FOUND = "Cart item not found."
+CART_ITEM_DELETED = "Cart item removed successfully."
 
+CART_QUANTITY_EXCEEDS_STOCK = (
+    "Requested quantity exceeds available stock."
+)
+
+PRODUCT_NOT_AVAILABLE = (
+    "Product is not available in this branch."
+)
+
+PRODUCT_VARIANT_INACTIVE = (
+    "Product variant is inactive."
+)
+
+BRANCH_INACTIVE = (
+    "Selected branch is currently inactive."
+)
 # =========================
 # Order Messages
 # =========================
