@@ -21,6 +21,7 @@ from app.routes.branch_inventory_routes import router as branch_inventory_router
 from app.routes.customer_routes import router as customer_router
 from app.routes.cart_routes import router as cart_router
 from app.routes.branch_catalog_routes import router as branch_catalog_router
+from app.routes.order_routes import (router as order_router,)
 
 from app.middleware.logging_middleware import logging_middleware
 from app.middleware.cors import setup_cors
@@ -103,3 +104,4 @@ app.include_router(branch_inventory_router)
 app.include_router(customer_router)
 app.include_router(branch_catalog_router)
 app.include_router(cart_router)
+app.include_router(order_router)

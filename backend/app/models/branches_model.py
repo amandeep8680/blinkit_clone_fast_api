@@ -84,9 +84,16 @@ class Branch(Base):
     "BranchInventory",
     back_populates="branch",
     cascade="all, delete-orphan",
-)
+    )
 
     carts = relationship(
     "Cart",
     back_populates="branch",
-)
+    )
+    
+    # Branch model
+
+    orders = relationship(
+        "Order",
+        back_populates="branch",
+    )

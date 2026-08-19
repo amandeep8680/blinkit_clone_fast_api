@@ -1,0 +1,21 @@
+ORDER_PLACED = "placed"
+ORDER_CONFIRMED = "confirmed"
+ORDER_PACKING = "packing"
+ORDER_OUT_FOR_DELIVERY = "out-for-delivery"
+ORDER_DELIVERED = "delivered"
+ORDER_CANCELLED = "cancelled"
+
+ORDER_STATUSES = (
+    ORDER_PLACED,
+    ORDER_CONFIRMED,
+    ORDER_PACKING,
+    ORDER_OUT_FOR_DELIVERY,
+    ORDER_DELIVERED,
+    ORDER_CANCELLED,
+)
+
+
+PAYMENT_PENDING = "pending"
+PAYMENT_PAID = "paid"
+PAYMENT_FAILED = "failed"
+PAYMENT_REFUNDED = "refunded"

@@ -19,8 +19,8 @@ Run:
     python seed_blinkit2.py \
         --base-url http://127.0.0.1:8000 \
         --email deep@singh.com \
-        --password 12345 \
-        --branch-id 9bd23a89-3c74-43d2-b584-0394b91d00d3
+        --password 123456 \
+        --branch-id c63cc6c5-3d10-4d2d-86db-6d85523a7478
 """
 
 import argparse

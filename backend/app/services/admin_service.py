@@ -29,7 +29,7 @@ class UserService:
 
         if existing_admin:
             raise ConflictException(
-                msg.ADMIN_ALREADY_EXISTS
+                msg.ALREADY_EXISTS
             )
 
         new_admin = User(

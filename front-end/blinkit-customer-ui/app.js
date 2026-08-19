@@ -11,6 +11,8 @@ const state = {
   branches: [],
   catalog: [],
   cart: null,
+  orders: [],
+  selectedAddressId: localStorage.getItem("blinkit_customer_address") || "",
   category: "all",
   search: "",
   sort: "featured",
@@ -156,7 +158,7 @@ async function ensureCartForBranch(){
   let current=null;
   try{ current=await api("/cart"); }catch(e){ if(e.status!==404){} }
   if(current?.branch?.unique_id && current.branch.unique_id!==state.branch.unique_id){
-    try{await api("/cart/clear",{method:"DELETE"})}catch{}
+    try{await api("/cart/delete",{method:"DELETE"})}catch{}
     current=null;
   }
   if(!current){
@@ -311,13 +313,48 @@ async function changeQty(variantId,delta){
 }
 function renderAddresses(addresses){
   const list=$("#addressList");list.innerHTML="";
-  if(!addresses?.length){list.innerHTML='<div class="hint-card">No saved addresses yet.</div>';return}
+  if(!addresses?.length){
+    state.selectedAddressId="";
+    localStorage.removeItem("blinkit_customer_address");
+    list.innerHTML='<div class="hint-card">No saved addresses yet. Add an address before checkout.</div>';
+    return;
+  }
+
+  // Keep selected address if it still exists; otherwise prefer default address.
+  const selectedStillExists=addresses.some(a=>a.unique_id===state.selectedAddressId);
+  if(!selectedStillExists){
+    const preferred=addresses.find(a=>a.is_default) || addresses[0];
+    state.selectedAddressId=preferred?.unique_id || "";
+    if(state.selectedAddressId) localStorage.setItem("blinkit_customer_address",state.selectedAddressId);
+  }
+
   addresses.forEach(a=>{
-    const el=document.createElement("div");el.className="address-card";
-    el.innerHTML=`<b>${escapeHTML(a.label)} ${a.is_default?'<span class="default-chip">DEFAULT</span>':""}</b><p>${escapeHTML(a.address_line)}${a.landmark?`, ${escapeHTML(a.landmark)}`:""}<br>${escapeHTML(a.city)}, ${escapeHTML(a.state)} · ${escapeHTML(a.pincode)}</p>`;
+    const el=document.createElement("button");
+    el.type="button";
+    el.className=`address-card address-choice ${state.selectedAddressId===a.unique_id?"selected":""}`;
+    el.dataset.addressId=a.unique_id || "";
+    el.innerHTML=`
+      <span>
+        <b>${escapeHTML(a.label||"Address")} ${a.is_default?'<span class="default-chip">DEFAULT</span>':""}</b>
+        <p>${escapeHTML(a.address_line||"")}${a.landmark?`, ${escapeHTML(a.landmark)}`:""}<br>${escapeHTML(a.city||"")}, ${escapeHTML(a.state||"")} · ${escapeHTML(a.pincode||"")}</p>
+      </span>
+      <span>${state.selectedAddressId===a.unique_id?"✓ Selected":"Use this"}</span>
+    `;
+    el.onclick=()=>{
+      state.selectedAddressId=a.unique_id || "";
+      if(state.selectedAddressId) localStorage.setItem("blinkit_customer_address",state.selectedAddressId);
+      renderAddresses(state.customer?.addresses||[]);
+      toast("Delivery address selected");
+    };
     list.appendChild(el);
-  })
+  });
 }
+
+function getSelectedAddress(){
+  const addresses=state.customer?.addresses||[];
+  return addresses.find(a=>a.unique_id===state.selectedAddressId) || null;
+}
+
 function readableError(e){
   let m=e?.message||String(e);
   try{
@@ -335,7 +372,7 @@ $("#overlay").onclick=closeDrawers;
 $("#accountBtn").onclick=()=>state.accessToken?openDrawer("accountDrawer"):openDialog("authModal");
 $("#cartBtn").onclick=async()=>{if(!state.accessToken){openDialog("authModal");return}try{await loadCart()}catch(e){toast(readableError(e),"error")}openDrawer("cartDrawer")};
 $("#locationBtn").onclick=async()=>{if(!state.accessToken){openDialog("authModal");return}if(!state.branches.length){try{await loadBranches()}catch(e){toast(readableError(e),"error")}}openDialog("branchModal")};
-$("#checkoutBtn").onclick=()=>openDialog("infoModal");
+$("#checkoutBtn").onclick=()=>openCheckout();
 // $("#clearCartBtn").onclick=async()=>{try{await api("/cart/clear",{method:"DELETE"});await loadCart();toast("Cart cleared")}catch(e){toast(readableError(e),"error")}};
 $("#clearCartBtn").onclick = async () => {
   try {
@@ -409,10 +446,438 @@ $("#saveSettingsBtn").onclick=async()=>{
   if(state.accessToken){await bootstrapCustomer()}
 };
 $("#logoutBtn").onclick=()=>{
-  ["blinkit_customer_access","blinkit_customer_refresh","blinkit_customer_id","blinkit_customer_profile","blinkit_customer_branch"].forEach(k=>localStorage.removeItem(k));
-  state.accessToken="";state.refreshToken="";state.customerId="";state.customer=null;state.branch=null;state.cart=null;state.catalog=[];
+  ["blinkit_customer_access","blinkit_customer_refresh","blinkit_customer_id","blinkit_customer_profile","blinkit_customer_branch","blinkit_customer_address"].forEach(k=>localStorage.removeItem(k));
+  state.accessToken="";state.refreshToken="";state.customerId="";state.customer=null;state.branch=null;state.cart=null;state.catalog=[];state.orders=[];state.selectedAddressId="";
   closeDrawers();showLoggedInUI();renderCart();toast("Logged out");
 };
 
+
+// ============================================================
+// CUSTOMER ORDERS + CHECKOUT
+// ============================================================
+
+function ensureOrdersUI(){
+  if($("#customerCheckoutModal")) return;
+
+  const style=document.createElement("style");
+  style.textContent=`
+    .address-choice{width:100%;text-align:left;display:flex;justify-content:space-between;gap:14px;align-items:center;cursor:pointer}
+    .address-choice.selected{outline:2px solid #0c831f;outline-offset:1px}
+    .orders-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 16px}
+    .orders-list{display:grid;gap:12px}
+    .order-card{border:1px solid #e7e7e7;border-radius:14px;padding:14px;background:#fff}
+    .order-card-top,.order-card-actions,.order-row,.checkout-row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .order-card-top{margin-bottom:10px}
+    .order-card small,.order-detail small{color:#777}
+    .order-status{font-size:12px;font-weight:800;text-transform:uppercase;padding:5px 9px;border-radius:999px;background:#f1f3f5}
+    .order-card-actions{margin-top:12px;flex-wrap:wrap}
+    .order-card-actions button{cursor:pointer}
+    .order-detail-items{display:grid;gap:9px;margin:14px 0}
+    .order-item{padding:10px 0;border-bottom:1px solid #eee}
+    .order-summary-box{border-top:1px solid #eee;margin-top:14px;padding-top:12px;display:grid;gap:8px}
+    .order-total-row{font-size:17px;font-weight:800}
+    .checkout-address{padding:12px;border:1px solid #e7e7e7;border-radius:12px;margin:12px 0}
+    .checkout-note{width:100%;min-height:78px;resize:vertical;padding:10px;border:1px solid #ddd;border-radius:10px;box-sizing:border-box}
+    .checkout-payment{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px}
+    .order-empty{text-align:center;padding:28px 12px;color:#777}
+    .order-modal-box{min-width:min(560px,92vw);max-width:680px}
+    .order-modal-scroll{max-height:68vh;overflow:auto}
+  `;
+  document.head.appendChild(style);
+
+  const checkout=document.createElement("dialog");
+  checkout.id="customerCheckoutModal";
+  checkout.innerHTML=`
+    <div class="order-modal-box">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">CHECKOUT</p>
+          <h2>Place your order</h2>
+        </div>
+        <button type="button" data-order-dialog-close="customerCheckoutModal">×</button>
+      </div>
+
+      <div id="customerCheckoutBody"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button type="button" class="secondary-btn" data-order-dialog-close="customerCheckoutModal">Cancel</button>
+        <button type="button" class="primary-btn" id="placeOrderBtn">Place order</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(checkout);
+
+  const orders=document.createElement("dialog");
+  orders.id="customerOrdersModal";
+  orders.innerHTML=`
+    <div class="order-modal-box">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">YOUR PURCHASES</p>
+          <h2>My Orders</h2>
+        </div>
+        <button type="button" data-order-dialog-close="customerOrdersModal">×</button>
+      </div>
+
+      <div class="orders-toolbar">
+        <span id="ordersMeta">Loading…</span>
+        <button type="button" class="secondary-btn" id="refreshOrdersBtn">Refresh</button>
+      </div>
+
+      <div class="order-modal-scroll">
+        <div id="customerOrdersList" class="orders-list"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(orders);
+
+  const detail=document.createElement("dialog");
+  detail.id="customerOrderDetailModal";
+  detail.innerHTML=`
+    <div class="order-modal-box">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ORDER DETAILS</p>
+          <h2 id="orderDetailTitle">Order</h2>
+        </div>
+        <button type="button" data-order-dialog-close="customerOrderDetailModal">×</button>
+      </div>
+      <div id="customerOrderDetailBody" class="order-modal-scroll"></div>
+    </div>
+  `;
+  document.body.appendChild(detail);
+
+  $$("[data-order-dialog-close]").forEach(btn=>{
+    btn.onclick=()=>$("#"+btn.dataset.orderDialogClose)?.close();
+  });
+
+  $("#placeOrderBtn").onclick=submitOrderFromCheckout;
+  $("#refreshOrdersBtn").onclick=()=>loadMyOrders().catch(e=>toast(readableError(e),"error"));
+
+  // Add "My Orders" shortcut to the existing account drawer if available.
+  const account=$("#accountDrawer");
+  if(account && !$("#myOrdersBtn")){
+    const btn=document.createElement("button");
+    btn.id="myOrdersBtn";
+    btn.type="button";
+    btn.className="secondary-btn full";
+    btn.style.marginTop="10px";
+    btn.textContent="My Orders";
+    btn.onclick=openMyOrders;
+    const logout=$("#logoutBtn");
+    if(logout?.parentNode) logout.parentNode.insertBefore(btn,logout);
+    else account.appendChild(btn);
+  }
+}
+
+function openCheckout(){
+  ensureOrdersUI();
+
+  if(!state.accessToken){
+    openDialog("authModal");
+    return;
+  }
+
+  const items=state.cart?.items||[];
+  if(!items.length){
+    toast("Your cart is empty.","error");
+    return;
+  }
+
+  const selected=getSelectedAddress();
+  const {total,count}=cartTotals();
+
+  $("#customerCheckoutBody").innerHTML=`
+    <div class="checkout-row">
+      <span>${count} item${count===1?"":"s"}</span>
+      <strong>${money(total)}</strong>
+    </div>
+
+    <div class="checkout-address">
+      <small>Deliver to</small>
+      ${
+        selected
+          ? `<div><b>${escapeHTML(selected.label||"Address")}</b><p>${escapeHTML(selected.address_line||"")}${selected.landmark?`, ${escapeHTML(selected.landmark)}`:""}<br>${escapeHTML(selected.city||"")}, ${escapeHTML(selected.state||"")} · ${escapeHTML(selected.pincode||"")}</p></div>`
+          : `<div><b>No delivery address selected</b><p>Open Account → Addresses and choose/add an address.</p></div>`
+      }
+    </div>
+
+    <label style="display:grid;gap:6px;margin:12px 0">
+      <span>Payment method</span>
+      <select id="checkoutPaymentMethod" class="checkout-payment">
+        <option value="cod">Cash on Delivery</option>
+      </select>
+    </label>
+
+    <label style="display:grid;gap:6px">
+      <span>Order note (optional)</span>
+      <textarea id="checkoutCustomerNote" class="checkout-note" maxlength="500" placeholder="Any delivery instructions?"></textarea>
+    </label>
+  `;
+
+  $("#placeOrderBtn").disabled=!selected;
+  openDialog("customerCheckoutModal");
+}
+
+async function submitOrderFromCheckout(){
+  const selected=getSelectedAddress();
+  if(!selected?.unique_id){
+    toast("Please select a delivery address first.","error");
+    return;
+  }
+
+  const btn=$("#placeOrderBtn");
+  const payment=$("#checkoutPaymentMethod")?.value || "cod";
+  const note=$("#checkoutCustomerNote")?.value?.trim() || "";
+
+  btn.disabled=true;
+  const oldText=btn.textContent;
+  btn.textContent="Placing order…";
+
+  try{
+    const order=await api("/orders",{
+      method:"POST",
+      body:JSON.stringify({
+        address_unique_id:selected.unique_id,
+        payment_method:payment,
+        customer_note:note
+      })
+    });
+
+    $("#customerCheckoutModal").close();
+
+    // A successful order normally consumes the cart on the backend.
+    state.cart=null;
+    renderCart();
+
+    try{ await loadCart(); }catch(e){ if(e.status!==404) console.warn("Cart reload after order:",e); }
+
+    toast("Order placed successfully");
+    await openOrderDetails(order?.unique_id,order);
+  }catch(e){
+    toast(readableError(e),"error");
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
+}
+
+async function loadMyOrders(){
+  if(!state.accessToken){
+    openDialog("authModal");
+    return [];
+  }
+
+  ensureOrdersUI();
+  $("#ordersMeta").textContent="Loading orders…";
+  $("#customerOrdersList").innerHTML='<div class="order-empty">Loading…</div>';
+
+  const rows=await api("/orders/my?skip=0&limit=100");
+  state.orders=Array.isArray(rows)?rows:[];
+
+  $("#ordersMeta").textContent=`${state.orders.length} order${state.orders.length===1?"":"s"}`;
+  renderMyOrders();
+  return state.orders;
+}
+
+function renderMyOrders(){
+  const host=$("#customerOrdersList");
+  if(!host)return;
+
+  if(!state.orders.length){
+    host.innerHTML='<div class="order-empty"><b>No orders yet</b><br><small>Your placed orders will appear here.</small></div>';
+    return;
+  }
+
+  host.innerHTML=state.orders.map(order=>{
+    const status=String(order.status||"pending").toLowerCase();
+    const canCancel=!["cancelled","canceled","delivered","completed"].includes(status);
+
+    return `
+      <article class="order-card">
+        <div class="order-card-top">
+          <div>
+            <small>Order ID</small><br>
+            <b>${escapeHTML(String(order.unique_id||"").slice(0,8))}</b>
+          </div>
+          <span class="order-status">${escapeHTML(order.status||"pending")}</span>
+        </div>
+
+        <div class="order-row"><span>Total</span><b>${money(order.total_amount)}</b></div>
+        <div class="order-row"><span>Payment</span><span>${escapeHTML(order.payment_method||"-")} · ${escapeHTML(order.payment_status||"-")}</span></div>
+        <div class="order-row"><span>Placed</span><small>${escapeHTML(formatDateTime(order.created_at))}</small></div>
+
+        <div class="order-card-actions">
+          <button type="button" class="secondary-btn" data-view-customer-order="${escapeHTML(order.unique_id||"")}">View details</button>
+          ${canCancel?`<button type="button" class="secondary-btn" data-cancel-customer-order="${escapeHTML(order.unique_id||"")}">Cancel order</button>`:""}
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  $$("[data-view-customer-order]",host).forEach(btn=>{
+    btn.onclick=()=>openOrderDetails(btn.dataset.viewCustomerOrder);
+  });
+
+  $$("[data-cancel-customer-order]",host).forEach(btn=>{
+    btn.onclick=()=>cancelMyOrder(btn.dataset.cancelCustomerOrder);
+  });
+}
+
+async function openMyOrders(){
+  if(!state.accessToken){
+    openDialog("authModal");
+    return;
+  }
+
+  ensureOrdersUI();
+  openDialog("customerOrdersModal");
+  try{
+    await loadMyOrders();
+  }catch(e){
+    $("#ordersMeta").textContent="Could not load orders";
+    $("#customerOrdersList").innerHTML=`<div class="order-empty">${escapeHTML(readableError(e))}</div>`;
+    toast(readableError(e),"error");
+  }
+}
+
+async function openOrderDetails(orderId,prefetched=null){
+  if(!orderId && !prefetched)return;
+  ensureOrdersUI();
+
+  let order=prefetched;
+  if(!order?.items || !order?.history){
+    try{
+      order=await api(`/orders/my/${encodeURIComponent(orderId)}`);
+    }catch(e){
+      toast(readableError(e),"error");
+      return;
+    }
+  }
+
+  $("#orderDetailTitle").textContent=`Order ${String(order.unique_id||"").slice(0,8)}`;
+  $("#customerOrderDetailBody").innerHTML=orderDetailsHTML(order);
+  openDialog("customerOrderDetailModal");
+
+  const cancelBtn=$("#cancelOrderFromDetailBtn");
+  if(cancelBtn){
+    cancelBtn.onclick=()=>cancelMyOrder(order.unique_id,true);
+  }
+}
+
+function orderDetailsHTML(order){
+  const items=Array.isArray(order.items)?order.items:[];
+  const history=Array.isArray(order.history)?order.history:[];
+  const status=String(order.status||"").toLowerCase();
+  const canCancel=!["cancelled","canceled","delivered","completed"].includes(status);
+
+  return `
+    <div class="order-detail">
+      <div class="order-card-top">
+        <div>
+          <small>Status</small><br>
+          <span class="order-status">${escapeHTML(order.status||"-")}</span>
+        </div>
+        <div style="text-align:right">
+          <small>Total</small><br>
+          <b>${money(order.total_amount)}</b>
+        </div>
+      </div>
+
+      <div class="checkout-address">
+        <small>Delivery address</small>
+        <p>
+          <b>${escapeHTML(order.address_label||"Address")}</b><br>
+          ${escapeHTML(order.address_line||"")}
+          ${order.landmark?`, ${escapeHTML(order.landmark)}`:""}<br>
+          ${escapeHTML(order.city||"")}, ${escapeHTML(order.state||"")} · ${escapeHTML(order.pincode||"")}
+        </p>
+      </div>
+
+      <h3>Items</h3>
+      <div class="order-detail-items">
+        ${
+          items.length
+            ? items.map(item=>`
+                <div class="order-item order-row">
+                  <div>
+                    <b>${escapeHTML(item.product_name||"Product")}</b><br>
+                    <small>${escapeHTML([item.variant_value,item.variant_unit].filter(Boolean).join(" "))} · Qty ${Number(item.quantity||0)}</small>
+                  </div>
+                  <b>${money(item.total_price)}</b>
+                </div>
+              `).join("")
+            : '<div class="order-empty">No item details returned.</div>'
+        }
+      </div>
+
+      <div class="order-summary-box">
+        <div class="order-row"><span>Subtotal</span><span>${money(order.subtotal)}</span></div>
+        <div class="order-row"><span>Delivery charge</span><span>${money(order.delivery_charge)}</span></div>
+        <div class="order-row"><span>Discount</span><span>− ${money(order.discount_amount)}</span></div>
+        <div class="order-row order-total-row"><span>Total</span><span>${money(order.total_amount)}</span></div>
+        <div class="order-row"><span>Payment</span><span>${escapeHTML(order.payment_method||"-")} · ${escapeHTML(order.payment_status||"-")}</span></div>
+      </div>
+
+      ${order.customer_note?`<div class="checkout-address"><small>Customer note</small><p>${escapeHTML(order.customer_note)}</p></div>`:""}
+
+      ${
+        history.length
+          ? `<h3>Order history</h3>
+             <div class="order-detail-items">
+               ${history.map(h=>`
+                 <div class="order-item">
+                   <b>${escapeHTML(h.status||"-")}</b>
+                   ${h.note?`<p>${escapeHTML(h.note)}</p>`:""}
+                   <small>${escapeHTML(formatDateTime(h.created_at))}</small>
+                 </div>
+               `).join("")}
+             </div>`
+          : ""
+      }
+
+      ${canCancel?`<button type="button" id="cancelOrderFromDetailBtn" class="secondary-btn full">Cancel order</button>`:""}
+    </div>
+  `;
+}
+
+async function cancelMyOrder(orderId,fromDetail=false){
+  if(!orderId)return;
+  if(!confirm("Are you sure you want to cancel this order?"))return;
+
+  try{
+    await api(`/orders/my/${encodeURIComponent(orderId)}/cancel`,{method:"PATCH"});
+    toast("Order cancelled");
+
+    if(fromDetail && $("#customerOrderDetailModal")?.open){
+      $("#customerOrderDetailModal").close();
+    }
+
+    if($("#customerOrdersModal")?.open){
+      await loadMyOrders();
+    }else{
+      // Keep cached list fresh when possible.
+      state.orders=state.orders.map(o=>o.unique_id===orderId?{...o,status:"cancelled"}:o);
+    }
+  }catch(e){
+    toast(readableError(e),"error");
+  }
+}
+
+function formatDateTime(value){
+  if(!value)return "-";
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?String(value):d.toLocaleString("en-IN");
+}
+
+// Create order UI on initial script load.
+ensureOrdersUI();
+
+
 showLoggedInUI();
 if(state.accessToken) bootstrapCustomer();
+
+
+
+
+

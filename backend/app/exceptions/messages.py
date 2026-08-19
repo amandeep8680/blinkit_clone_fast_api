@@ -226,3 +226,36 @@ BRAND_HAS_PRODUCTS = (
 CART_CREATED = "Cart created successfully"
 CART_CLEARED = "Cart cleared successfully"
 CART_DELETED = "Cart deleted successfully"
+
+# =========================
+# Order Messages
+# =========================
+
+ORDER_NOT_FOUND = "Order not found."
+ORDER_CREATED = "Order placed successfully."
+ORDER_CANCELLED = "Order cancelled successfully."
+
+ORDER_EMPTY_CART = "Cannot place an order with an empty cart."
+
+ORDER_ALREADY_CANCELLED = "Order is already cancelled."
+ORDER_ALREADY_DELIVERED = "Delivered order cannot be modified."
+ORDER_CANNOT_CANCEL = "This order can no longer be cancelled."
+
+INVALID_ORDER_STATUS = "Invalid order status."
+INVALID_ORDER_STATUS_TRANSITION = "Invalid order status transition."
+
+ORDER_BRANCH_INACTIVE = "Order branch is currently inactive."
+
+ORDER_ITEM_OUT_OF_STOCK = "One or more cart items are out of stock."
+ORDER_ITEM_NOT_AVAILABLE = "One or more cart items are unavailable."
+
+ORDER_ADDRESS_NOT_FOUND = "Selected customer address was not found."
+
+
+# =========================
+# Payment Messages
+# =========================
+
+INVALID_PAYMENT_METHOD = "Invalid payment method."
+INVALID_PAYMENT_STATUS = "Invalid payment status."
+PAYMENT_STATUS_UPDATED = "Payment status updated successfully."

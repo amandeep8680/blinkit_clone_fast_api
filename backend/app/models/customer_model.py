@@ -95,6 +95,13 @@ class Customer(Base):
     cascade="all, delete-orphan",
 )
 
+    # Customer model
+
+    orders = relationship(
+        "Order",
+        back_populates="customer",
+    )
+
 
 class CustomerAddress(Base):
     __tablename__ = "customer_addresses"

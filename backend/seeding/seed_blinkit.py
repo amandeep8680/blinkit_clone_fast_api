@@ -19,8 +19,8 @@ Run:
     python seed_blinkit.py \
         --base-url http://127.0.0.1:8000 \
         --email deep@singh.com \
-        --password 12345 \
-        --branch-id 3b867f90-dd2e-44ec-a5fc-6825ff5521a2
+        --password 123456 \
+        --branch-id 11bfd7ca-9a53-4fa9-b92c-8d128e20075e
 """
 
 import argparse
@@ -57,395 +57,154 @@ DEFAULT_STOCK = 60
 SEED_DATA = [
 
     # ========================================================
-    # 1. DABUR
+    # 1. FARMROOT
     # ========================================================
 
     {
         "brand": {
-            "name": "Dabur",
-            "slug": "dabur-second-branch",
+            "name": "FarmRoot",
+            "slug": "farmroot-fresh-2026",
             "logo_url": IMAGE_URL,
         },
 
         "categories": [
             {
-                "name": "Health & Wellness",
-                "slug": "health-wellness-second",
+                "name": "Fresh Pantry",
+                "slug": "fresh-pantry-2026",
                 "image_url": IMAGE_URL,
 
                 "subcategories": [
                     {
-                        "name": "Honey & Health Foods",
-                        "slug": "honey-health-foods-second",
+                        "name": "Natural Spreads",
+                        "slug": "natural-spreads-2026",
                         "image_url": IMAGE_URL,
 
                         "products": [
-
                             {
-                                "name": "Dabur Honey",
-                                "slug": "dabur-honey-second",
-                                "description": "Pure honey for everyday use.",
+                                "name": "FarmRoot Wildflower Honey",
+                                "slug": "farmroot-wildflower-honey-2026",
+                                "description": "Smooth floral honey sourced for everyday breakfast and beverages.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-DABUR-HONEY-250G",
-                                        "value": "250",
+                                        "sku": "NEW-FARMROOT-HONEY-300G",
+                                        "value": "300",
                                         "unit": "g",
-                                        "mrp": 125,
-                                        "selling_price": 115,
-                                    },
-                                    {
-                                        "sku": "SECOND-DABUR-HONEY-500G",
-                                        "value": "500",
-                                        "unit": "g",
-                                        "mrp": 240,
-                                        "selling_price": 220,
-                                    },
-                                ],
-                            },
-
-                            {
-                                "name": "Dabur Chyawanprash",
-                                "slug": "dabur-chyawanprash-second",
-                                "description": "Traditional Ayurvedic health supplement.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-DABUR-CHYAWAN-500G",
-                                        "value": "500",
-                                        "unit": "g",
-                                        "mrp": 225,
-                                        "selling_price": 205,
-                                    },
-                                    {
-                                        "sku": "SECOND-DABUR-CHYAWAN-1KG",
-                                        "value": "1",
-                                        "unit": "kg",
-                                        "mrp": 410,
-                                        "selling_price": 379,
-                                    },
-                                ],
-                            },
-
-                        ],
-                    }
-                ],
-            }
-        ],
-    },
-
-
-    # ========================================================
-    # 2. KELLOGGS
-    # ========================================================
-
-    {
-        "brand": {
-            "name": "Kellogg's",
-            "slug": "kelloggs-second-branch",
-            "logo_url": IMAGE_URL,
-        },
-
-        "categories": [
-            {
-                "name": "Breakfast Foods",
-                "slug": "breakfast-foods-second",
-                "image_url": IMAGE_URL,
-
-                "subcategories": [
-                    {
-                        "name": "Cereals",
-                        "slug": "cereals-second",
-                        "image_url": IMAGE_URL,
-
-                        "products": [
-
-                            {
-                                "name": "Kellogg's Corn Flakes",
-                                "slug": "kelloggs-corn-flakes-second",
-                                "description": "Crispy breakfast corn flakes.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-KELLOGGS-CORN-250G",
-                                        "value": "250",
-                                        "unit": "g",
-                                        "mrp": 135,
-                                        "selling_price": 125,
-                                    },
-                                    {
-                                        "sku": "SECOND-KELLOGGS-CORN-475G",
-                                        "value": "475",
-                                        "unit": "g",
-                                        "mrp": 230,
-                                        "selling_price": 210,
-                                    },
-                                ],
-                            },
-
-                            {
-                                "name": "Kellogg's Chocos",
-                                "slug": "kelloggs-chocos-second",
-                                "description": "Chocolate flavoured breakfast cereal.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-KELLOGGS-CHOCOS-250G",
-                                        "value": "250",
-                                        "unit": "g",
-                                        "mrp": 150,
+                                        "mrp": 159,
                                         "selling_price": 139,
                                     },
                                     {
-                                        "sku": "SECOND-KELLOGGS-CHOCOS-385G",
-                                        "value": "385",
+                                        "sku": "NEW-FARMROOT-HONEY-650G",
+                                        "value": "650",
                                         "unit": "g",
-                                        "mrp": 220,
+                                        "mrp": 299,
+                                        "selling_price": 269,
+                                    },
+                                ],
+                            },
+
+                            {
+                                "name": "FarmRoot Peanut Cocoa Spread",
+                                "slug": "farmroot-peanut-cocoa-spread-2026",
+                                "description": "Creamy peanut and cocoa spread for toast, snacks and quick desserts.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-FARMROOT-COCOA-200G",
+                                        "value": "200",
+                                        "unit": "g",
+                                        "mrp": 149,
+                                        "selling_price": 129,
+                                    },
+                                    {
+                                        "sku": "NEW-FARMROOT-COCOA-400G",
+                                        "value": "400",
+                                        "unit": "g",
+                                        "mrp": 269,
+                                        "selling_price": 239,
+                                    },
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    },
+
+    # ========================================================
+    # 2. MORNING MATE
+    # ========================================================
+
+    {
+        "brand": {
+            "name": "Morning Mate",
+            "slug": "morning-mate-2026",
+            "logo_url": IMAGE_URL,
+        },
+
+        "categories": [
+            {
+                "name": "Breakfast Essentials",
+                "slug": "breakfast-essentials-2026",
+                "image_url": IMAGE_URL,
+
+                "subcategories": [
+                    {
+                        "name": "Cereals & Granola",
+                        "slug": "cereals-granola-2026",
+                        "image_url": IMAGE_URL,
+
+                        "products": [
+                            {
+                                "name": "Morning Mate Crunchy Corn Cereal",
+                                "slug": "morning-mate-corn-cereal-2026",
+                                "description": "Light and crispy corn cereal for a quick morning bowl.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-MORNING-CORN-300G",
+                                        "value": "300",
+                                        "unit": "g",
+                                        "mrp": 145,
+                                        "selling_price": 129,
+                                    },
+                                    {
+                                        "sku": "NEW-MORNING-CORN-500G",
+                                        "value": "500",
+                                        "unit": "g",
+                                        "mrp": 229,
                                         "selling_price": 205,
                                     },
                                 ],
                             },
 
-                        ],
-                    }
-                ],
-            }
-        ],
-    },
-
-
-    # ========================================================
-    # 3. CADBURY
-    # ========================================================
-
-    {
-        "brand": {
-            "name": "Cadbury",
-            "slug": "cadbury-second-branch",
-            "logo_url": IMAGE_URL,
-        },
-
-        "categories": [
-            {
-                "name": "Chocolates & Sweets",
-                "slug": "chocolates-sweets-second",
-                "image_url": IMAGE_URL,
-
-                "subcategories": [
-                    {
-                        "name": "Chocolate Bars",
-                        "slug": "chocolate-bars-second",
-                        "image_url": IMAGE_URL,
-
-                        "products": [
-
                             {
-                                "name": "Cadbury Dairy Milk",
-                                "slug": "cadbury-dairy-milk-second",
-                                "description": "Classic milk chocolate bar.",
+                                "name": "Morning Mate Choco Millet Bites",
+                                "slug": "morning-mate-choco-millet-2026",
+                                "description": "Chocolate-flavoured crunchy millet bites made for breakfast or snacking.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-CADBURY-DM-50G",
-                                        "value": "50",
+                                        "sku": "NEW-MORNING-CHOCO-250G",
+                                        "value": "250",
                                         "unit": "g",
-                                        "mrp": 50,
-                                        "selling_price": 48,
+                                        "mrp": 165,
+                                        "selling_price": 149,
                                     },
                                     {
-                                        "sku": "SECOND-CADBURY-DM-110G",
-                                        "value": "110",
+                                        "sku": "NEW-MORNING-CHOCO-450G",
+                                        "value": "450",
                                         "unit": "g",
-                                        "mrp": 100,
-                                        "selling_price": 95,
-                                    },
-                                ],
-                            },
-
-                            {
-                                "name": "Cadbury Dairy Milk Silk",
-                                "slug": "cadbury-silk-second",
-                                "description": "Smooth premium milk chocolate.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-CADBURY-SILK-60G",
-                                        "value": "60",
-                                        "unit": "g",
-                                        "mrp": 90,
-                                        "selling_price": 85,
-                                    },
-                                    {
-                                        "sku": "SECOND-CADBURY-SILK-150G",
-                                        "value": "150",
-                                        "unit": "g",
-                                        "mrp": 190,
-                                        "selling_price": 179,
-                                    },
-                                ],
-                            },
-
-                        ],
-                    }
-                ],
-            }
-        ],
-    },
-
-
-    # ========================================================
-    # 4. REAL
-    # ========================================================
-
-    {
-        "brand": {
-            "name": "Real",
-            "slug": "real-juice-second-branch",
-            "logo_url": IMAGE_URL,
-        },
-
-        "categories": [
-            {
-                "name": "Juices & Drinks",
-                "slug": "juices-drinks-second",
-                "image_url": IMAGE_URL,
-
-                "subcategories": [
-                    {
-                        "name": "Fruit Juices",
-                        "slug": "fruit-juices-second",
-                        "image_url": IMAGE_URL,
-
-                        "products": [
-
-                            {
-                                "name": "Real Mixed Fruit Juice",
-                                "slug": "real-mixed-fruit-second",
-                                "description": "Mixed fruit juice beverage.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-REAL-MIXED-1L",
-                                        "value": "1",
-                                        "unit": "L",
-                                        "mrp": 130,
-                                        "selling_price": 119,
-                                    },
-                                ],
-                            },
-
-                            {
-                                "name": "Real Mango Juice",
-                                "slug": "real-mango-second",
-                                "description": "Mango fruit beverage.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-REAL-MANGO-1L",
-                                        "value": "1",
-                                        "unit": "L",
-                                        "mrp": 125,
-                                        "selling_price": 115,
-                                    },
-                                    {
-                                        "sku": "SECOND-REAL-MANGO-200ML",
-                                        "value": "200",
-                                        "unit": "ml",
-                                        "mrp": 30,
-                                        "selling_price": 28,
-                                    },
-                                ],
-                            },
-
-                        ],
-                    }
-                ],
-            }
-        ],
-    },
-
-
-    # ========================================================
-    # 5. DETTOL
-    # ========================================================
-
-    {
-        "brand": {
-            "name": "Dettol",
-            "slug": "dettol-second-branch",
-            "logo_url": IMAGE_URL,
-        },
-
-        "categories": [
-            {
-                "name": "Home & Hygiene",
-                "slug": "home-hygiene-second",
-                "image_url": IMAGE_URL,
-
-                "subcategories": [
-                    {
-                        "name": "Hand Wash & Sanitizers",
-                        "slug": "handwash-sanitizers-second",
-                        "image_url": IMAGE_URL,
-
-                        "products": [
-
-                            {
-                                "name": "Dettol Original Liquid Handwash",
-                                "slug": "dettol-handwash-second",
-                                "description": "Antibacterial liquid hand wash.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-DETTOL-HANDWASH-200ML",
-                                        "value": "200",
-                                        "unit": "ml",
-                                        "mrp": 95,
-                                        "selling_price": 89,
-                                    },
-                                    {
-                                        "sku": "SECOND-DETTOL-HANDWASH-750ML",
-                                        "value": "750",
-                                        "unit": "ml",
-                                        "mrp": 250,
+                                        "mrp": 259,
                                         "selling_price": 229,
                                     },
                                 ],
                             },
-
-                            {
-                                "name": "Dettol Instant Hand Sanitizer",
-                                "slug": "dettol-sanitizer-second",
-                                "description": "Instant hand sanitizer gel.",
-                                "image_url": IMAGE_URL,
-
-                                "variants": [
-                                    {
-                                        "sku": "SECOND-DETTOL-SANITIZER-50ML",
-                                        "value": "50",
-                                        "unit": "ml",
-                                        "mrp": 35,
-                                        "selling_price": 32,
-                                    },
-                                    {
-                                        "sku": "SECOND-DETTOL-SANITIZER-200ML",
-                                        "value": "200",
-                                        "unit": "ml",
-                                        "mrp": 110,
-                                        "selling_price": 99,
-                                    },
-                                ],
-                            },
-
                         ],
                     }
                 ],
@@ -453,73 +212,155 @@ SEED_DATA = [
         ],
     },
 
-
     # ========================================================
-    # 6. NESCAFE
+    # 3. COCOCRAFT
     # ========================================================
 
     {
         "brand": {
-            "name": "Nescafe",
-            "slug": "nescafe-second-branch",
+            "name": "CocoCraft",
+            "slug": "cococraft-2026",
             "logo_url": IMAGE_URL,
         },
 
         "categories": [
             {
-                "name": "Tea Coffee & More",
-                "slug": "tea-coffee-second",
+                "name": "Sweet Treats",
+                "slug": "sweet-treats-2026",
                 "image_url": IMAGE_URL,
 
                 "subcategories": [
                     {
-                        "name": "Coffee",
-                        "slug": "coffee-second",
+                        "name": "Chocolate & Confectionery",
+                        "slug": "chocolate-confectionery-2026",
                         "image_url": IMAGE_URL,
 
                         "products": [
-
                             {
-                                "name": "Nescafe Classic Coffee",
-                                "slug": "nescafe-classic-second",
-                                "description": "Instant pure coffee.",
+                                "name": "CocoCraft Creamy Milk Chocolate",
+                                "slug": "cococraft-creamy-milk-2026",
+                                "description": "Classic creamy milk chocolate with a smooth melt and balanced sweetness.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-NESCAFE-CLASSIC-50G",
-                                        "value": "50",
+                                        "sku": "NEW-COCOCRAFT-MILK-55G",
+                                        "value": "55",
                                         "unit": "g",
-                                        "mrp": 180,
-                                        "selling_price": 169,
+                                        "mrp": 60,
+                                        "selling_price": 54,
                                     },
                                     {
-                                        "sku": "SECOND-NESCAFE-CLASSIC-100G",
-                                        "value": "100",
+                                        "sku": "NEW-COCOCRAFT-MILK-120G",
+                                        "value": "120",
                                         "unit": "g",
-                                        "mrp": 350,
-                                        "selling_price": 325,
+                                        "mrp": 125,
+                                        "selling_price": 112,
                                     },
                                 ],
                             },
 
                             {
-                                "name": "Nescafe Sunrise Coffee",
-                                "slug": "nescafe-sunrise-second",
-                                "description": "Coffee and chicory instant blend.",
+                                "name": "CocoCraft Hazelnut Silk Bar",
+                                "slug": "cococraft-hazelnut-silk-2026",
+                                "description": "Rich milk chocolate bar with a silky hazelnut-style flavour.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-NESCAFE-SUNRISE-50G",
-                                        "value": "50",
+                                        "sku": "NEW-COCOCRAFT-HAZEL-70G",
+                                        "value": "70",
                                         "unit": "g",
-                                        "mrp": 135,
+                                        "mrp": 99,
+                                        "selling_price": 89,
+                                    },
+                                    {
+                                        "sku": "NEW-COCOCRAFT-HAZEL-150G",
+                                        "value": "150",
+                                        "unit": "g",
+                                        "mrp": 199,
+                                        "selling_price": 179,
+                                    },
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    },
+
+    # ========================================================
+    # 4. FRUITWAVE
+    # ========================================================
+
+    {
+        "brand": {
+            "name": "FruitWave",
+            "slug": "fruitwave-drinks-2026",
+            "logo_url": IMAGE_URL,
+        },
+
+        "categories": [
+            {
+                "name": "Beverages",
+                "slug": "beverages-refreshers-2026",
+                "image_url": IMAGE_URL,
+
+                "subcategories": [
+                    {
+                        "name": "Fruit Drinks",
+                        "slug": "fruit-drinks-2026",
+                        "image_url": IMAGE_URL,
+
+                        "products": [
+                            {
+                                "name": "FruitWave Tropical Blend",
+                                "slug": "fruitwave-tropical-blend-2026",
+                                "description": "Refreshing tropical fruit drink with mango, pineapple and citrus notes.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-FRUITWAVE-TROPICAL-1L",
+                                        "value": "1",
+                                        "unit": "L",
+                                        "mrp": 139,
                                         "selling_price": 125,
                                     },
+                                    {
+                                        "sku": "NEW-FRUITWAVE-TROPICAL-250ML",
+                                        "value": "250",
+                                        "unit": "ml",
+                                        "mrp": 40,
+                                        "selling_price": 36,
+                                    },
                                 ],
                             },
 
+                            {
+                                "name": "FruitWave Pink Guava Drink",
+                                "slug": "fruitwave-pink-guava-2026",
+                                "description": "Sweet and tangy pink guava beverage served best chilled.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-FRUITWAVE-GUAVA-1L",
+                                        "value": "1",
+                                        "unit": "L",
+                                        "mrp": 129,
+                                        "selling_price": 116,
+                                    },
+                                    {
+                                        "sku": "NEW-FRUITWAVE-GUAVA-250ML",
+                                        "value": "250",
+                                        "unit": "ml",
+                                        "mrp": 38,
+                                        "selling_price": 34,
+                                    },
+                                ],
+                            },
                         ],
                     }
                 ],
@@ -527,65 +368,212 @@ SEED_DATA = [
         ],
     },
 
-
     # ========================================================
-    # 7. PAMPERS
+    # 5. PUREGUARD
     # ========================================================
 
     {
         "brand": {
-            "name": "Pampers",
-            "slug": "pampers-second-branch",
+            "name": "PureGuard",
+            "slug": "pureguard-hygiene-2026",
             "logo_url": IMAGE_URL,
         },
 
         "categories": [
             {
-                "name": "Baby Care",
-                "slug": "baby-care-second",
+                "name": "Personal Hygiene",
+                "slug": "personal-hygiene-2026",
                 "image_url": IMAGE_URL,
 
                 "subcategories": [
                     {
-                        "name": "Baby Diapers",
-                        "slug": "baby-diapers-second",
+                        "name": "Hand Care",
+                        "slug": "hand-care-2026",
                         "image_url": IMAGE_URL,
 
                         "products": [
-
                             {
-                                "name": "Pampers Baby Dry Pants",
-                                "slug": "pampers-baby-dry-second",
-                                "description": "Comfortable baby diaper pants.",
+                                "name": "PureGuard Aloe Hand Wash",
+                                "slug": "pureguard-aloe-handwash-2026",
+                                "description": "Gentle liquid hand wash with a fresh aloe-inspired fragrance.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-PAMPERS-M-30PCS",
-                                        "value": "30",
-                                        "unit": "pcs",
-                                        "mrp": 499,
-                                        "selling_price": 449,
+                                        "sku": "NEW-PUREGUARD-WASH-250ML",
+                                        "value": "250",
+                                        "unit": "ml",
+                                        "mrp": 109,
+                                        "selling_price": 99,
                                     },
                                     {
-                                        "sku": "SECOND-PAMPERS-L-30PCS",
-                                        "value": "30",
-                                        "unit": "pcs",
-                                        "mrp": 549,
-                                        "selling_price": 489,
+                                        "sku": "NEW-PUREGUARD-WASH-750ML",
+                                        "value": "750",
+                                        "unit": "ml",
+                                        "mrp": 279,
+                                        "selling_price": 249,
                                     },
                                 ],
                             },
 
                             {
-                                "name": "Pampers Premium Care Pants",
-                                "slug": "pampers-premium-care-second",
-                                "description": "Premium baby diaper pants.",
+                                "name": "PureGuard Fresh Hand Sanitizer",
+                                "slug": "pureguard-fresh-sanitizer-2026",
+                                "description": "Quick-dry hand sanitizer gel for travel, work and daily use.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-PAMPERS-PREMIUM-M-24PCS",
+                                        "sku": "NEW-PUREGUARD-SAN-100ML",
+                                        "value": "100",
+                                        "unit": "ml",
+                                        "mrp": 59,
+                                        "selling_price": 52,
+                                    },
+                                    {
+                                        "sku": "NEW-PUREGUARD-SAN-250ML",
+                                        "value": "250",
+                                        "unit": "ml",
+                                        "mrp": 129,
+                                        "selling_price": 115,
+                                    },
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    },
+
+    # ========================================================
+    # 6. BEANBAY
+    # ========================================================
+
+    {
+        "brand": {
+            "name": "BeanBay",
+            "slug": "beanbay-coffee-2026",
+            "logo_url": IMAGE_URL,
+        },
+
+        "categories": [
+            {
+                "name": "Tea Coffee & Drinks",
+                "slug": "tea-coffee-drinks-2026",
+                "image_url": IMAGE_URL,
+
+                "subcategories": [
+                    {
+                        "name": "Instant Coffee",
+                        "slug": "instant-coffee-2026",
+                        "image_url": IMAGE_URL,
+
+                        "products": [
+                            {
+                                "name": "BeanBay Classic Instant Coffee",
+                                "slug": "beanbay-classic-instant-2026",
+                                "description": "Bold instant coffee with a roasted aroma and smooth finish.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-BEANBAY-CLASSIC-50G",
+                                        "value": "50",
+                                        "unit": "g",
+                                        "mrp": 189,
+                                        "selling_price": 172,
+                                    },
+                                    {
+                                        "sku": "NEW-BEANBAY-CLASSIC-100G",
+                                        "value": "100",
+                                        "unit": "g",
+                                        "mrp": 359,
+                                        "selling_price": 329,
+                                    },
+                                ],
+                            },
+
+                            {
+                                "name": "BeanBay Morning Roast Coffee",
+                                "slug": "beanbay-morning-roast-2026",
+                                "description": "Balanced instant coffee blend designed for a bright morning cup.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-BEANBAY-MORNING-75G",
+                                        "value": "75",
+                                        "unit": "g",
+                                        "mrp": 229,
+                                        "selling_price": 209,
+                                    },
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    },
+
+    # ========================================================
+    # 7. TINYBLOOM
+    # ========================================================
+
+    {
+        "brand": {
+            "name": "TinyBloom",
+            "slug": "tinybloom-baby-2026",
+            "logo_url": IMAGE_URL,
+        },
+
+        "categories": [
+            {
+                "name": "Baby Essentials",
+                "slug": "baby-essentials-2026",
+                "image_url": IMAGE_URL,
+
+                "subcategories": [
+                    {
+                        "name": "Diapers & Baby Pants",
+                        "slug": "diapers-baby-pants-2026",
+                        "image_url": IMAGE_URL,
+
+                        "products": [
+                            {
+                                "name": "TinyBloom SoftFit Diaper Pants",
+                                "slug": "tinybloom-softfit-pants-2026",
+                                "description": "Soft and flexible diaper pants designed for everyday comfort.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-TINYBLOOM-M-32PCS",
+                                        "value": "32",
+                                        "unit": "pcs",
+                                        "mrp": 479,
+                                        "selling_price": 429,
+                                    },
+                                    {
+                                        "sku": "NEW-TINYBLOOM-L-30PCS",
+                                        "value": "30",
+                                        "unit": "pcs",
+                                        "mrp": 529,
+                                        "selling_price": 475,
+                                    },
+                                ],
+                            },
+
+                            {
+                                "name": "TinyBloom NightComfort Diaper Pants",
+                                "slug": "tinybloom-nightcomfort-2026",
+                                "description": "High-absorbency diaper pants for longer overnight comfort.",
+                                "image_url": IMAGE_URL,
+
+                                "variants": [
+                                    {
+                                        "sku": "NEW-TINYBLOOM-NIGHT-L-24PCS",
                                         "value": "24",
                                         "unit": "pcs",
                                         "mrp": 599,
@@ -593,7 +581,6 @@ SEED_DATA = [
                                     },
                                 ],
                             },
-
                         ],
                     }
                 ],
@@ -601,66 +588,70 @@ SEED_DATA = [
         ],
     },
 
-
     # ========================================================
-    # 8. GODREJ
+    # 8. HOMEBREEZE
     # ========================================================
 
     {
         "brand": {
-            "name": "Godrej",
-            "slug": "godrej-second-branch",
+            "name": "HomeBreeze",
+            "slug": "homebreeze-2026",
             "logo_url": IMAGE_URL,
         },
 
         "categories": [
             {
-                "name": "Household Supplies",
-                "slug": "household-supplies-second",
+                "name": "Home Care",
+                "slug": "home-care-2026",
                 "image_url": IMAGE_URL,
 
                 "subcategories": [
                     {
-                        "name": "Air Fresheners",
-                        "slug": "air-fresheners-second",
+                        "name": "Room Fresheners",
+                        "slug": "room-fresheners-2026",
                         "image_url": IMAGE_URL,
 
                         "products": [
-
                             {
-                                "name": "Godrej Aer Spray",
-                                "slug": "godrej-aer-spray-second",
-                                "description": "Room air freshener spray.",
+                                "name": "HomeBreeze Citrus Room Spray",
+                                "slug": "homebreeze-citrus-spray-2026",
+                                "description": "Bright citrus room freshener spray for bedrooms and living spaces.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-GODREJ-AER-240ML",
+                                        "sku": "NEW-HOMEBREEZE-CITRUS-240ML",
                                         "value": "240",
                                         "unit": "ml",
-                                        "mrp": 169,
-                                        "selling_price": 155,
+                                        "mrp": 179,
+                                        "selling_price": 159,
                                     },
                                 ],
                             },
 
                             {
-                                "name": "Godrej Aer Pocket",
-                                "slug": "godrej-aer-pocket-second",
-                                "description": "Compact bathroom fragrance.",
+                                "name": "HomeBreeze Lavender Gel Freshener",
+                                "slug": "homebreeze-lavender-gel-2026",
+                                "description": "Compact lavender-scented gel freshener for bathrooms and cupboards.",
                                 "image_url": IMAGE_URL,
 
                                 "variants": [
                                     {
-                                        "sku": "SECOND-GODREJ-AER-POCKET-10G",
-                                        "value": "10",
+                                        "sku": "NEW-HOMEBREEZE-LAVENDER-60G",
+                                        "value": "60",
                                         "unit": "g",
-                                        "mrp": 65,
-                                        "selling_price": 59,
-                                    }
+                                        "mrp": 89,
+                                        "selling_price": 79,
+                                    },
+                                    {
+                                        "sku": "NEW-HOMEBREEZE-LAVENDER-120G",
+                                        "value": "120",
+                                        "unit": "g",
+                                        "mrp": 149,
+                                        "selling_price": 135,
+                                    },
                                 ],
                             },
-
                         ],
                     }
                 ],
