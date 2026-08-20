@@ -1,8 +1,5 @@
 # app/routes/cart_event_routes.py
 
-# curl -N \
-# -H "Authorization: Bearer TOKEN" \
-# http://127.0.0.1:8000/cart/events
 import json
 
 from fastapi import (
@@ -19,6 +16,7 @@ from app.constants import roles
 
 from app.realtime.cart_subscription import (
     create_cart_pubsub,
+    get_cart_control_channel,
 )
 
 
@@ -33,40 +31,74 @@ router = APIRouter(
 # =========================================================
 
 def cart_event_stream(
-    db: Session,
+    pubsub,
     customer,
 ):
     """
-    Listen to Redis inventory channels for
-    customer's cart and stream events to frontend.
+    Listen to both:
+
+    - inventory update channels
+    - customer's subscription control channel
     """
 
-    pubsub = create_cart_pubsub(
-        db,
-        customer,
+    control_channel = (
+        get_cart_control_channel(
+            customer.id
+        )
     )
 
     try:
+
         for message in pubsub.listen():
 
-            # Redis also sends subscribe/unsubscribe messages.
-            # We only want actual published inventory messages.
             if message["type"] != "message":
                 continue
 
+            channel = message["channel"]
             data = message["data"]
 
-            # SSE format:
-            #
-            # data: {...}
-            #
-            # Blank line is required after every SSE event.
+            # ---------------------------------------------
+            # Internal subscription control message
+            # ---------------------------------------------
+
+            if channel == control_channel:
+
+                command = json.loads(data)
+
+                action = command.get(
+                    "action"
+                )
+
+                inventory_channel = (
+                    command.get("channel")
+                )
+
+                if action == "subscribe":
+
+                    pubsub.subscribe(
+                        inventory_channel
+                    )
+
+                elif action == "unsubscribe":
+
+                    pubsub.unsubscribe(
+                        inventory_channel
+                    )
+
+                # Control messages are INTERNAL.
+                # Do not send them to frontend.
+                continue
+
+            # ---------------------------------------------
+            # Actual inventory event
+            # ---------------------------------------------
+
             yield (
                 f"data: {data}\n\n"
             )
 
     finally:
-        # Customer closes cart screen / connection disconnects.
+
         pubsub.close()
 
 
@@ -89,9 +121,16 @@ def cart_events(
     Open SSE connection for logged-in customer's cart.
     """
 
+    # Important:
+    # Create/validate pubsub BEFORE StreamingResponse starts.
+    pubsub = create_cart_pubsub(
+        db,
+        current_user,
+    )
+
     return StreamingResponse(
         cart_event_stream(
-            db,
+            pubsub,
             current_user,
         ),
         media_type="text/event-stream",

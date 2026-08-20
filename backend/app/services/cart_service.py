@@ -23,6 +23,10 @@ from app.exceptions.custom_exceptions import (
     NotFoundException,
 )
 
+from app.realtime.cart_subscription import (
+    publish_cart_subscription_change,
+)
+
 from app.exceptions import messages as msg
 
 
@@ -504,12 +508,20 @@ class CartService:
         db.commit()
         db.refresh(cart_item)
 
+        # Dynamically subscribe currently-open SSE connection
+        # to this newly added variant.
+        publish_cart_subscription_change(
+            customer_id=customer.id,
+            action="subscribe",
+            branch_id=cart.branch_id,
+            product_variant_id=variant.id,
+        )
+
         return self.build_cart_item_response(
             db,
             cart,
             cart_item,
         )
-
 
     # =====================================================
     # Update Cart Item Quantity
@@ -688,7 +700,12 @@ class CartService:
 
         db.delete(cart_item)
         db.commit()
-
+        publish_cart_subscription_change(
+            customer_id=customer.id,
+            action="unsubscribe",
+            branch_id=cart.branch_id,
+            product_variant_id=variant.id,
+        )
         return {
             "message": msg.CART_ITEM_DELETED
         }
@@ -699,38 +716,53 @@ class CartService:
     # =====================================================
 
     def clear_cart(
-        self,
-        db: Session,
-        customer,
-    ):
-        """
-        Remove every item from active cart.
-
-        Cart itself remains active.
-        """
-
-        cart = self.find_active_cart(
-            db,
+            self,
+            db: Session,
             customer,
-        )
+        ):
+            """
+            Remove every item from active cart.
 
-        (
-            db.query(CartItem)
-            .filter(
-                CartItem.cart_id
-                == cart.id
+            Cart itself remains active.
+            """
+
+            cart = self.find_active_cart(
+                db,
+                customer,
             )
-            .delete(
-                synchronize_session=False
+
+            # Save variant IDs BEFORE deleting cart items.
+            variant_ids = [
+                item.product_variant_id
+                for item in cart.items
+            ]
+
+            (
+                db.query(CartItem)
+                .filter(
+                    CartItem.cart_id == cart.id
+                )
+                .delete(
+                    synchronize_session=False
+                )
             )
-        )
 
-        db.commit()
+            db.commit()
 
-        return {
-            "message": msg.CART_CLEARED
-        }
+            # Remove all inventory subscriptions
+            # from customer's currently-open SSE connection.
+            for variant_id in variant_ids:
 
+                publish_cart_subscription_change(
+                    customer_id=customer.id,
+                    action="unsubscribe",
+                    branch_id=cart.branch_id,
+                    product_variant_id=variant_id,
+                )
+
+            return {
+                "message": msg.CART_CLEARED
+            }
 
     # =====================================================
     # Delete Cart
@@ -750,8 +782,24 @@ class CartService:
             customer,
         )
 
+        branch_id = cart.branch_id
+
+        variant_ids = [
+            item.product_variant_id
+            for item in cart.items
+        ]
+
         db.delete(cart)
         db.commit()
+
+        for variant_id in variant_ids:
+
+            publish_cart_subscription_change(
+                customer_id=customer.id,
+                action="unsubscribe",
+                branch_id=branch_id,
+                product_variant_id=variant_id,
+            )
 
         return {
             "message": msg.CART_DELETED
