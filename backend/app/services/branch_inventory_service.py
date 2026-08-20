@@ -16,7 +16,9 @@ from  app.exceptions.custom_exceptions import (
 )
 
 from  app.exceptions import messages as msg
-
+from app.realtime.inventory_pubsub import (
+    publish_inventory_update,
+)
 
 class BranchInventoryService:
 
@@ -305,3 +307,141 @@ class BranchInventoryService:
         db.commit()
 
         return {"message": msg.INVENTORY_DELETED}
+
+
+
+    def increase_stock(
+    self,
+    db: Session,
+    branch_unique_id: str,
+    product_variant_unique_id: str,
+    quantity: int,
+):
+        if quantity <= 0:
+            raise BadRequestException(
+                msg.INVALID_STOCK_QUANTITY
+            )
+
+        inventory = self.get_inventory(
+            db,
+            branch_unique_id,
+            product_variant_unique_id,
+        )
+
+        inventory.stock_quantity += quantity
+
+        db.commit()
+        db.refresh(inventory)
+
+        # Publish realtime inventory update
+        publish_inventory_update(
+            branch_id=inventory.branch_id,
+            product_variant_id=inventory.product_variant_id,
+            stock_quantity=inventory.stock_quantity,
+            is_available=inventory.is_available,
+        )
+
+        return inventory
+
+
+
+    def decrease_stock(
+    self,
+    db: Session,
+    branch_unique_id: str,
+    product_variant_unique_id: str,
+    quantity: int,
+):
+        if quantity <= 0:
+            raise BadRequestException(
+                msg.INVALID_STOCK_QUANTITY
+            )
+
+        inventory = self.get_inventory(
+            db,
+            branch_unique_id,
+            product_variant_unique_id,
+        )
+
+        if inventory.stock_quantity < quantity:
+            raise BadRequestException(
+                msg.INSUFFICIENT_STOCK
+            )
+
+        inventory.stock_quantity -= quantity
+
+        db.commit()
+        db.refresh(inventory)
+
+        publish_inventory_update(
+            branch_id=inventory.branch_id,
+            product_variant_id=inventory.product_variant_id,
+            stock_quantity=inventory.stock_quantity,
+            is_available=inventory.is_available,
+        )
+
+        return inventory
+
+    def activate_inventory(
+    self,
+    db: Session,
+    branch_unique_id: str,
+    product_variant_unique_id: str,
+):
+        inventory = self.get_inventory(
+            db,
+            branch_unique_id,
+            product_variant_unique_id,
+        )
+
+        if inventory.is_available:
+            raise BadRequestException(
+                msg.INVENTORY_ALREADY_ACTIVE
+            )
+
+        inventory.is_available = True
+
+        db.commit()
+        db.refresh(inventory)
+
+        publish_inventory_update(
+            branch_id=inventory.branch_id,
+            product_variant_id=inventory.product_variant_id,
+            stock_quantity=inventory.stock_quantity,
+            is_available=inventory.is_available,
+        )
+
+        return inventory
+
+
+
+    def deactivate_inventory(
+    self,
+    db: Session,
+    branch_unique_id: str,
+    product_variant_unique_id: str,
+):
+        inventory = self.get_inventory(
+            db,
+            branch_unique_id,
+            product_variant_unique_id,
+        )
+
+        if not inventory.is_available:
+            raise BadRequestException(
+                msg.INVENTORY_ALREADY_INACTIVE
+            )
+
+        inventory.is_available = False
+
+        db.commit()
+        db.refresh(inventory)
+
+        publish_inventory_update(
+            branch_id=inventory.branch_id,
+            product_variant_id=inventory.product_variant_id,
+            stock_quantity=inventory.stock_quantity,
+            is_available=inventory.is_available,
+        )
+
+        return inventory

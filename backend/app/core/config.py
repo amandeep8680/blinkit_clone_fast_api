@@ -32,3 +32,8 @@ if not SECRET_KEY:
     raise ValueError(
         "SECRET_KEY is not in .env"
     )
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://localhost:6379/0",
+)
