@@ -24,8 +24,9 @@ from app.routes.branch_catalog_routes import router as branch_catalog_router
 from app.routes.order_routes import (router as order_router,)
 from app.routes.cart_event_routes import (router as cart_event_router,)
 
-
+from app.core.logging_config import setup_logging
 from app.middleware.logging_middleware import logging_middleware
+from app.middleware.rate_limit_middleware import rate_limit_middleware
 from app.middleware.cors import setup_cors
 
 
@@ -33,16 +34,24 @@ from app.middleware.cors import setup_cors
 # Application Lifespan
 # -----------------------------------
 
+logger = logging.getLogger("app")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
 
-        print("✅ Database connected successfully!")
+        logger.info(
+            "Database connected successfully"
+        )
 
-    except SQLAlchemyError as e:
-        print(f"❌ Database connection failed: {e}")
+    except SQLAlchemyError:
+        logger.critical(
+            "Database connection failed",
+            exc_info=True,
+        )
 
     yield
 
@@ -50,17 +59,11 @@ async def lifespan(app: FastAPI):
 # -----------------------------------
 # Logging configuration
 # -----------------------------------
-
+setup_logging()
 logging.basicConfig(
     level=logging.INFO,
-    format=(
-        "%(asctime)s | "
-        "%(levelname)s | "
-        "%(name)s | "
-        "%(message)s"
-    )
+    format="%(levelname)s | %(message)s",
 )
-
 
 # -----------------------------------
 # FastAPI Application
@@ -72,8 +75,68 @@ app = FastAPI(
     description="Backend APIs for Blinkit Clone",
     lifespan=lifespan,
 )
+@app.get("/test-error")
+async def test_error():
+    result = 10 / 0
+    return {"result": result}
+
+# Fixed Window test API
+@app.get("/test-fixed")
+async def test_fixed():
+    return {
+        "message": "Fixed window request allowed"
+    }
 
 
+# Sliding Window test API
+@app.get("/test-sliding")
+async def test_sliding():
+    return {
+        "message": "Sliding window request allowed"
+    }
+
+
+# Token Bucket test API
+@app.get("/test-token")
+async def test_token():
+    return {
+        "message": "Token bucket request allowed"
+    }
+
+
+# Leaky Bucket test API
+@app.get("/test-leaky")
+async def test_leaky():
+    return {
+        "message": "Leaky bucket request allowed"
+    }
+
+import logging
+
+logger = logging.getLogger("app")
+
+
+@app.get("/test-info")
+async def test_info():
+    logger.info("This is INFO log")
+    return {"message": "info logged"}
+
+
+@app.get("/test-warning")
+async def test_warning():
+    logger.warning("This is WARNING log")
+    return {"message": "warning logged"}
+
+
+@app.get("/test-error")
+async def test_error():
+    return 10 / 0
+
+
+@app.get("/test-critical")
+async def test_critical():
+    logger.critical("This is CRITICAL log")
+    return {"message": "critical logged"}
 # -----------------------------------
 # Logging Middleware
 # -----------------------------------

@@ -11,6 +11,7 @@ from app.core.config import REDIS_URL
 
 redis_client = redis.Redis.from_url(
     REDIS_URL,
+    encoding ="utf-8",
     decode_responses=True,
 )
 
