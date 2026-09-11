@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
-
+from app.core.cache import delete_cache_pattern
+from app.core.cache_keys import (
+    ACTIVE_CATEGORIES_CACHE_PATTERN,
+)
 from  app.models.category_model import Category
 from  app.schemas.category_schema import (
     CategoryCreate,
@@ -11,9 +14,16 @@ from  app.exceptions.custom_exceptions import (
     ConflictException,
     NotFoundException,
 )
-
+from fastapi.encoders import jsonable_encoder
 from  app.exceptions import messages as msg
 
+from app.core.cache import get_cache, set_cache ,get_or_set_cache
+from app.core.cache_keys import active_categories_cache_key
+
+def delete_cache():
+    delete_cache_pattern(
+    ACTIVE_CATEGORIES_CACHE_PATTERN
+)
 
 class CategoryService:
 
@@ -50,6 +60,7 @@ class CategoryService:
         db.add(category)
         db.commit()
         db.refresh(category)
+        delete_cache()
 
         return category
 
@@ -102,30 +113,102 @@ class CategoryService:
         )
 
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # #  Direct simple redis 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+    # def get_active_categories(
+    #     self,
+    #     db: Session,
+    #     skip: int = 0,
+    #     limit: int = 100,
+    # ):
+    #     """
+    #     Get only active categories.
+    #     """
+
+
+    #     # Make cache keys
+    #     cache_key =  active_categories_cache_key(
+    #         skip=skip,
+    #         limit=limit,
+    #         )
+
+    #     # check redis
+    #     cached_data = get_cache(cache_key)
+
+    #     if cached_data is not None:
+    #         print(f"✅ CACHE HIT | key={cache_key}")
+    #         return cached_data
+        
+    #     print(f"❌ CACHE MISS | key={cache_key}")
+    #     # if cache miss 
+    #     categories =  (
+    #         db.query(Category)
+    #         .filter(
+    #             Category.is_active.is_(True)
+    #         )
+    #         .order_by(
+    #             Category.name.asc()
+    #         )
+    #         .offset(skip)
+    #         .limit(limit)
+    #         .all()
+    #     )
+
+    #     # convert sqlalchemyibjec tin to JSON serializable
+    #     data = jsonable_encoder(categories)
+
+    #     # store in redis
+    #     set_cache(
+    #         key=cache_key,
+    #         data = data , 
+    #         ttl = 60
+    #     )
+
+    #     return data
+
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # #  Reusable redis cache 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
     def get_active_categories(
         self,
         db: Session,
         skip: int = 0,
         limit: int = 100,
-    ):
-        """
-        Get only active categories.
-        """
+            ):
 
-        return (
-            db.query(Category)
-            .filter(
-                Category.is_active.is_(True)
-            )
-            .order_by(
-                Category.name.asc()
-            )
-            .offset(skip)
-            .limit(limit)
-            .all()
+        cache_key = active_categories_cache_key(
+            skip=skip,
+            limit=limit,
         )
 
+        def fetch_categories():
+            categories = (
+                db.query(Category)
+                .filter(
+                    Category.is_active.is_(True)
+                )
+                .order_by(
+                    Category.name.asc()
+                )
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
 
+            return jsonable_encoder(categories)
+
+        return get_or_set_cache(
+            key=cache_key,
+            fetch_function=fetch_categories,
+            ttl=60,
+            )
+
+            
     def update_category(
         self,
         db: Session,
@@ -186,6 +269,9 @@ class CategoryService:
 
         db.commit()
         db.refresh(category)
+        delete_cache_pattern(
+            ACTIVE_CATEGORIES_CACHE_PATTERN
+        )
 
         return category
 
@@ -213,6 +299,9 @@ class CategoryService:
 
         db.commit()
         db.refresh(category)
+        delete_cache_pattern(
+            ACTIVE_CATEGORIES_CACHE_PATTERN
+        )
 
         return category
 
@@ -240,6 +329,9 @@ class CategoryService:
 
         db.commit()
         db.refresh(category)
+        delete_cache_pattern(
+            ACTIVE_CATEGORIES_CACHE_PATTERN
+        )
 
         return category
 
@@ -264,7 +356,9 @@ class CategoryService:
 
         db.delete(category)
         db.commit()
-
+        delete_cache_pattern(
+                    ACTIVE_CATEGORIES_CACHE_PATTERN
+                )
         return {
             "message": msg.CATEGORY_DELETED
         }
