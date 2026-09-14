@@ -28,8 +28,7 @@ from app.core.logging_config import setup_logging
 from app.middleware.logging_middleware import logging_middleware
 from app.middleware.rate_limit_middleware import rate_limit_middleware
 from app.middleware.cors import setup_cors
-
-
+from app.middleware.security_headers import security_headers_middleware
 # -----------------------------------
 # Application Lifespan
 # -----------------------------------
