@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr , Field
 
 
 class LoginRequest(BaseModel):
@@ -18,3 +18,23 @@ class RefreshTokenRequest(BaseModel):
 class RefreshTokenResponse(BaseModel):
     access_token: str
     token_type : str = "bearer"
+
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+
+    otp: str = Field(
+        min_length=6,
+        max_length=6,
+        pattern=r"^\d{6}$",
+    )
+
+    new_password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
