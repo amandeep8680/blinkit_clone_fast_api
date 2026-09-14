@@ -142,7 +142,9 @@ async def test_critical():
 # -----------------------------------
 
 app.middleware("http")(logging_middleware)
-
+app.middleware("http")(
+    security_headers_middleware
+)
 
 # -----------------------------------
 # CORS Middleware
