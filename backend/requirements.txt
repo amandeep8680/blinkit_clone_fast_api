@@ -12,7 +12,7 @@ bcrypt==4.0.1
 redis
 # jwt authentication
 PyJWT
-
+psycopg2-binary
 
 
 ## For psotgreSQL server
