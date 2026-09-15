@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, Request
 
 from typing import Annotated
-
 from sqlalchemy.orm import Session
-
+import traceback
 from app.database.database import get_db
 
 from app.schemas.auth_schema import (
@@ -45,17 +44,23 @@ def login(
     credentials: LoginRequest,
     db: DBSession,
 ):
-    client_ip = (
-        request.client.host
-        if request.client
-        else "unknown"
-    )
+    try:
+        client_ip = (
+            request.client.host
+            if request.client
+            else "unknown"
+        )
 
-    return auth_service.login(
-        db=db,
-        credentials=credentials,
-        client_ip=client_ip,
-    )
+        return auth_service.login(
+            db=db,
+            credentials=credentials,
+            client_ip=client_ip,
+        )
+
+    except Exception as e:
+        print("LOGIN ERROR:", str(e))
+        traceback.print_exc()
+        raise
 
 
 # =========================================================
