@@ -1,98 +1,155 @@
+"""
+Middleware for logging HTTP requests and unexpected errors.
+"""
+
 import logging
 import time
-import uuid
 
 from fastapi import Request
-from fastapi.responses import JSONResponse
 
 
 logger = logging.getLogger("app")
 
 
-def error_response(
-    *,
-    status_code: int,
-    message: str,
-    request_id: str,
-) -> JSONResponse:
-    """
-    Build a standard error response.
-    """
-
-    response_data = {
-        "success": False,
-        "detail": message,
-        "request_id": request_id,
+def get_request_context(request: Request) -> dict:
+    """Return common request information used in logs."""
+    return {
+        "request_id": getattr(
+            request.state,
+            "request_id",
+            None,
+        ),
+        "method": request.method,
+        "path": request.url.path,
+        "client_ip": (
+            request.client.host
+            if request.client
+            else "unknown"
+        ),
     }
 
-    response = JSONResponse(
-        status_code=status_code,
-        content=response_data,
+
+def get_duration_ms(start_time: float) -> float:
+    """Return request execution time in milliseconds."""
+    return (
+        time.perf_counter() - start_time
+    ) * 1000
+
+
+def get_log_level(status_code: int) -> int:
+    """Return log level according to HTTP status code."""
+    if status_code >= 500:
+        return logging.ERROR
+
+    if status_code >= 400:
+        return logging.WARNING
+
+    return logging.INFO
+
+
+def log_request(
+    *,
+    request: Request,
+    status_code: int,
+    duration_ms: float,
+) -> None:
+    """Log a completed HTTP request."""
+
+    context = get_request_context(request)
+
+    log_data = {
+        **context,
+        "status_code": status_code,
+        "duration_ms": duration_ms,
+    }
+
+    message = (
+        "API REQUEST | "
+        "request_id=%(request_id)s | "
+        "method=%(method)s | "
+        "path=%(path)s | "
+        "status=%(status_code)s | "
+        "duration_ms=%(duration_ms).2f | "
+        "client_ip=%(client_ip)s"
     )
 
-    response.headers["X-Request-ID"] = request_id
+    log_level = get_log_level(status_code)
 
-    return response
+    logger.log(
+        log_level,
+        message,
+        log_data,
+    )
+
+
+def log_unexpected_error(
+    *,
+    request: Request,
+    exc: Exception,
+    duration_ms: float,
+) -> None:
+    """Log an unexpected exception with its traceback."""
+
+    context = get_request_context(request)
+
+    log_data = {
+        **context,
+        "error_type": type(exc).__name__,
+        "error": str(exc),
+        "duration_ms": duration_ms,
+    }
+
+    # logger.exception automatically includes traceback
+    logger.exception(
+        "API UNEXPECTED ERROR | "
+        "request_id=%(request_id)s | "
+        "method=%(method)s | "
+        "path=%(path)s | "
+        "error_type=%(error_type)s | "
+        "error=%(error)s | "
+        "duration_ms=%(duration_ms).2f | "
+        "client_ip=%(client_ip)s",
+        log_data,
+    )
 
 
 async def logging_middleware(
     request: Request,
     call_next,
 ):
-    request_id = str(uuid.uuid4())
+    """
+    Measure request time and log completed requests
+    or unexpected errors.
+    """
 
-    request.state.request_id = request_id
-
+    # Start request timer
     start_time = time.perf_counter()
 
     try:
+        # Continue request processing
         response = await call_next(request)
 
-        duration_ms = (
-            time.perf_counter() - start_time
-        ) * 1000
-
-        response.headers["X-Request-ID"] = request_id
-
-        logger.info(
-            "API REQUEST | request_id=%s | method=%s | "
-            "path=%s | status=%s | duration_ms=%.2f | client_ip=%s",
-            request_id,
-            request.method,
-            request.url.path,
-            response.status_code,
-            duration_ms,
-            request.client.host
-            if request.client
-            else "unknown",
-        )
-
-        return response
-
     except Exception as exc:
-        duration_ms = (
-            time.perf_counter() - start_time
-        ) * 1000
+        duration_ms = get_duration_ms(start_time)
 
-        # Only truly unexpected exceptions reach here.
-        # Full traceback is logged.
-        logger.exception(
-            "API UNEXPECTED ERROR | request_id=%s | method=%s | "
-            "path=%s | error_type=%s | error=%s | "
-            "duration_ms=%.2f | client_ip=%s",
-            request_id,
-            request.method,
-            request.url.path,
-            type(exc).__name__,
-            str(exc),
-            duration_ms,
-            request.client.host
-            if request.client
-            else "unknown",
+        # Log error with traceback
+        log_unexpected_error(
+            request=request,
+            exc=exc,
+            duration_ms=duration_ms,
         )
 
-        return error_response(
-            status_code=500,
-            message="Internal server error",
-            request_id=request_id,
-        )
+        # Re-raise the same exception
+        raise
+
+    # Calculate total request time
+    duration_ms = get_duration_ms(start_time)
+
+    # Log completed request
+    log_request(
+        request=request,
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+    )
+
+    return response

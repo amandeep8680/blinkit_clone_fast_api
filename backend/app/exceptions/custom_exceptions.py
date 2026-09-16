@@ -1,102 +1,72 @@
-# app/exceptions/custom_exceptions.py
+"""
+Custom application exceptions.
 
-from fastapi import HTTPException, status
+These exceptions represent expected application errors.
+They do not create HTTP responses directly.
+"""
 
 
-class AppException(HTTPException):
-    """
-    Base exception for application HTTP errors.
-    """
+class AppException(Exception):
+    """Base exception for all application errors."""
+
+    status_code = 500
+    code = "INTERNAL_ERROR"
+    message = "An unexpected error occurred."
 
     def __init__(
         self,
-        status_code: int,
-        detail: str
+        message: str | None = None,
+        details: dict | None = None,
     ):
-        super().__init__(
-            status_code=status_code,
-            detail=detail
-        )
+        self.message = message or self.message
+        self.details = details
+
+        super().__init__(self.message)
 
 
 class BadRequestException(AppException):
-    """
-    400 - Request data or operation is invalid.
-    """
+    """Raised when the request contains invalid business data."""
 
-    def __init__(self, message: str):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
-        )
+    status_code = 400
+    code = "BAD_REQUEST"
+    message = "Invalid request."
 
 
 class UnauthorizedException(AppException):
-    """
-    401 - User is not authenticated.
-    """
+    """Raised when authentication is required."""
 
-    def __init__(
-        self,
-        message: str = "Authentication required."
-    ):
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=message
-        )
+    status_code = 401
+    code = "UNAUTHORIZED"
+    message = "Authentication required."
 
 
 class ForbiddenException(AppException):
-    """
-    403 - User is authenticated but does not
-    have permission to access the resource.
-    """
+    """Raised when the user does not have permission."""
 
-    def __init__(
-        self,
-        message: str = "Permission denied."
-    ):
-        super().__init__(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=message
-        )
+    status_code = 403
+    code = "FORBIDDEN"
+    message = "Permission denied."
 
 
 class NotFoundException(AppException):
-    """
-    404 - Requested resource does not exist.
-    """
+    """Raised when a requested resource does not exist."""
 
-    def __init__(self, message: str):
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=message
-        )
+    status_code = 404
+    code = "NOT_FOUND"
+    message = "Resource not found."
 
 
 class ConflictException(AppException):
-    """
-    409 - Resource already exists or request
-    conflicts with current state.
-    """
+    """Raised when the request conflicts with existing data."""
 
-    def __init__(self, message: str):
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=message
-        )
+    status_code = 409
+    code = "CONFLICT"
+    message = "Resource conflict."
 
 
 class InternalServerException(AppException):
-    """
-    500 - Unexpected server-side error.
-    """
+    """Raised for known internal application failures."""
 
-    def __init__(
-        self,
-        message: str = "Something went wrong."
-    ):
-        super().__init__(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=message
-        )
+    status_code = 500
+    code = "INTERNAL_ERROR"
+    message = "Something went wrong."
